@@ -52,7 +52,6 @@ async function load() {
   loading.value = false
 }
 
-// Auto-detect suggestions from current challenges
 function buildSuggestions() {
   const s: HistoryEntry[] = []
   for (const row of challengeRows.value) {
@@ -76,7 +75,6 @@ function buildSuggestions() {
       })
     }
   }
-  // Filter out already logged ones
   const loggedIds = new Set(entries.value.map(e => e.challenge_id).filter(Boolean))
   suggestions.value = s.filter(s => !loggedIds.has(s.challenge_id))
 }
@@ -172,14 +170,24 @@ async function deleteEntry(id: string) {
   entries.value = entries.value.filter(e => e.id !== id)
 }
 
-function outcomeClass(o: string) {
-  if (o === 'Passed') return 'outcome-passed'
-  if (o === 'Failed') return 'outcome-failed'
-  return 'outcome-abandoned'
+function pnlPct(entry: HistoryEntry): string {
+  if (!entry.starting_balance || !entry.final_balance) return ''
+  const pct = ((entry.final_balance - entry.starting_balance) / entry.starting_balance) * 100
+  return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%'
+}
+
+function pnlClass(entry: HistoryEntry): string {
+  if (!entry.starting_balance || !entry.final_balance) return ''
+  return entry.final_balance >= entry.starting_balance ? 'pos' : 'neg'
 }
 
 function fmt(v: number) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
+function fmtDate(d: string | null) {
+  if (!d) return '—'
+  return d.slice(0, 10)
 }
 
 const stats = computed(() => {
@@ -204,63 +212,79 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="history-view">
-    <div class="page-header">
-      <div class="page-title-row">
-        <h1>Challenge History</h1>
-        <button class="btn-add" @click="openAdd()">+ Log Outcome</button>
+  <div class="hv">
+
+    <!-- ── Top bar ── -->
+    <div class="hv-topbar">
+      <div class="hv-identity">
+        <div class="hv-eyebrow">CHALLENGE LEDGER</div>
+        <h1 class="hv-title">History</h1>
+      </div>
+      <button class="hv-log-btn" @click="openAdd()">
+        <span class="log-btn-plus">+</span>
+        <span>Log Outcome</span>
+      </button>
+    </div>
+
+    <!-- ── Stats scoreboard ── -->
+    <div class="scoreboard" v-if="entries.length > 0">
+      <div class="sb-cell">
+        <div class="sb-label">MISSIONS</div>
+        <div class="sb-val">{{ stats.total }}</div>
+      </div>
+      <div class="sb-sep" />
+      <div class="sb-cell">
+        <div class="sb-label">PASSED</div>
+        <div class="sb-val sb-green">{{ stats.passed }}</div>
+      </div>
+      <div class="sb-sep" />
+      <div class="sb-cell">
+        <div class="sb-label">FAILED</div>
+        <div class="sb-val sb-red">{{ stats.failed }}</div>
+      </div>
+      <div class="sb-sep" />
+      <div class="sb-cell">
+        <div class="sb-label">WIN RATE</div>
+        <div class="sb-val" :class="stats.passRate >= 50 ? 'sb-green' : 'sb-red'">{{ stats.passRate }}<span class="sb-unit">%</span></div>
+      </div>
+      <div class="sb-sep" />
+      <div class="sb-cell sb-cell--wide">
+        <div class="sb-label">TOTAL EXTRACTED</div>
+        <div class="sb-val sb-accent">{{ fmt(stats.payout) }}</div>
+      </div>
+      <template v-if="stats.avgDur !== null">
+        <div class="sb-sep" />
+        <div class="sb-cell">
+          <div class="sb-label">AVG DAYS</div>
+          <div class="sb-val">{{ stats.avgDur }}<span class="sb-unit">d</span></div>
+        </div>
+      </template>
+
+      <!-- Win bar -->
+      <div class="sb-win-bar">
+        <div
+          class="sb-win-fill"
+          :style="{ width: stats.passRate + '%' }"
+        />
       </div>
     </div>
 
-    <!-- Stats strip -->
-    <div class="stats-strip" v-if="entries.length > 0">
-      <div class="stat-cell">
-        <div class="stat-label">TOTAL</div>
-        <div class="stat-value">{{ stats.total }}</div>
-      </div>
-      <div class="stat-divider" />
-      <div class="stat-cell">
-        <div class="stat-label">PASSED</div>
-        <div class="stat-value green">{{ stats.passed }}</div>
-      </div>
-      <div class="stat-divider" />
-      <div class="stat-cell">
-        <div class="stat-label">FAILED</div>
-        <div class="stat-value red">{{ stats.failed }}</div>
-      </div>
-      <div class="stat-divider" />
-      <div class="stat-cell">
-        <div class="stat-label">PASS RATE</div>
-        <div class="stat-value" :class="stats.passRate >= 50 ? 'green' : 'red'">{{ stats.passRate }}%</div>
-      </div>
-      <div class="stat-divider" />
-      <div class="stat-cell">
-        <div class="stat-label">TOTAL PAYOUT</div>
-        <div class="stat-value cyan">{{ fmt(stats.payout) }}</div>
-      </div>
-      <div class="stat-divider" v-if="stats.avgDur !== null" />
-      <div class="stat-cell" v-if="stats.avgDur !== null">
-        <div class="stat-label">AVG DURATION</div>
-        <div class="stat-value">{{ stats.avgDur }}d</div>
-      </div>
-    </div>
-
-    <!-- Auto-detected suggestions -->
-    <div class="suggestions" v-if="suggestions.length > 0">
-      <div class="suggestions-header">
-        <span class="suggest-icon">⚡</span>
-        <span>Auto-detected outcomes — confirm to log</span>
+    <!-- ── Suggestions ── -->
+    <div class="alert-banner" v-if="suggestions.length > 0">
+      <div class="alert-head">
+        <span class="alert-pulse" />
+        <span class="alert-title">DETECTED OUTCOMES</span>
+        <span class="alert-count">{{ suggestions.length }}</span>
       </div>
       <div
         v-for="s in suggestions"
         :key="s.challenge_id!"
-        class="suggestion-row"
+        class="alert-row"
       >
-        <span :class="['outcome-chip', outcomeClass(s.outcome)]">{{ s.outcome }}</span>
-        <span class="suggest-alias">{{ s.alias }}</span>
-        <span class="suggest-meta">{{ s.prop_firm }} · {{ s.phase }}</span>
-        <span class="suggest-note">{{ s.notes }}</span>
-        <button class="btn-confirm" @click="openAdd({
+        <span class="alert-outcome">{{ s.outcome.toUpperCase() }}</span>
+        <span class="alert-alias">{{ s.alias }}</span>
+        <span class="alert-meta">{{ s.prop_firm }} · {{ s.phase }}</span>
+        <button class="alert-confirm-btn" @click="openAdd({
           challenge_id: s.challenge_id!,
           alias: s.alias,
           prop_firm: s.prop_firm,
@@ -271,149 +295,184 @@ onMounted(async () => {
           started_at: s.started_at ?? '',
           ended_at: s.ended_at ?? '',
           notes: s.notes ?? '',
-        })">Log</button>
+        })">LOG →</alert-confirm-btn>
       </div>
     </div>
 
-    <!-- History table -->
-    <div class="table-wrap">
-      <div v-if="loading" class="empty-state">Loading...</div>
-      <div v-else-if="entries.length === 0" class="empty-state">
-        No history yet. Log your first outcome above.
+    <!-- ── Ledger ── -->
+    <div class="ledger-wrap">
+      <div v-if="loading" class="ledger-empty">
+        <span class="ledger-spinner" />
+        <span>Loading records...</span>
       </div>
-      <table v-else class="history-table">
+      <div v-else-if="entries.length === 0" class="ledger-empty">
+        <div class="ledger-empty-icon">≡</div>
+        <div class="ledger-empty-text">No records in the ledger.</div>
+        <div class="ledger-empty-sub">Log your first outcome to get started.</div>
+      </div>
+
+      <table v-else class="ledger">
         <thead>
-          <tr>
-            <th>Outcome</th>
+          <tr class="ledger-head">
+            <th class="lh-status" />
             <th>Account</th>
-            <th>Prop Firm</th>
+            <th>Firm</th>
             <th>Phase</th>
-            <th class="text-right">Starting</th>
-            <th class="text-right">Final</th>
-            <th class="text-right">Payout</th>
-            <th>Started</th>
-            <th>Ended</th>
-            <th class="text-right">Days</th>
-            <th>Notes</th>
-            <th class="th-actions" />
+            <th class="lh-r">Starting</th>
+            <th class="lh-r">Final</th>
+            <th class="lh-r">P&L</th>
+            <th class="lh-r">Payout</th>
+            <th>Period</th>
+            <th class="lh-r lh-days">Days</th>
+            <th class="lh-notes">Notes</th>
+            <th class="lh-act" />
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="(entry, i) in entries"
             :key="entry.id"
-            :style="{ 'animation-delay': `${i * 25}ms` }"
-            class="data-row"
+            class="ledger-row"
+            :class="'row-' + entry.outcome.toLowerCase()"
+            :style="{ animationDelay: `${i * 30}ms` }"
           >
-            <td>
-              <span :class="['outcome-chip', outcomeClass(entry.outcome)]">{{ entry.outcome }}</span>
+            <!-- Left status bar -->
+            <td class="lc-status">
+              <span class="status-pill" :class="'pill-' + entry.outcome.toLowerCase()">
+                {{ entry.outcome === 'Passed' ? 'PASS' : entry.outcome === 'Failed' ? 'FAIL' : 'ABND' }}
+              </span>
             </td>
-            <td class="alias-cell">{{ entry.alias }}</td>
-            <td class="text-secondary">{{ entry.prop_firm }}</td>
-            <td class="text-secondary">{{ entry.phase }}</td>
-            <td class="text-right mono">{{ entry.starting_balance > 0 ? fmt(entry.starting_balance) : '—' }}</td>
-            <td class="text-right mono">{{ entry.final_balance > 0 ? fmt(entry.final_balance) : '—' }}</td>
-            <td class="text-right mono" :class="entry.payout_received > 0 ? 'text-green' : ''">
+            <td class="lc-alias">{{ entry.alias }}</td>
+            <td class="lc-firm">{{ entry.prop_firm }}</td>
+            <td class="lc-phase">{{ entry.phase }}</td>
+            <td class="lc-r lc-money">{{ entry.starting_balance > 0 ? fmt(entry.starting_balance) : '—' }}</td>
+            <td class="lc-r lc-money">{{ entry.final_balance > 0 ? fmt(entry.final_balance) : '—' }}</td>
+            <td class="lc-r lc-pnl" :class="pnlClass(entry)">{{ pnlPct(entry) || '—' }}</td>
+            <td class="lc-r lc-payout" :class="entry.payout_received > 0 ? 'lc-extracted' : ''">
               {{ entry.payout_received > 0 ? fmt(entry.payout_received) : '—' }}
             </td>
-            <td class="text-ghost mono-sm">{{ entry.started_at ?? '—' }}</td>
-            <td class="text-ghost mono-sm">{{ entry.ended_at ?? '—' }}</td>
-            <td class="text-right mono">{{ entry.duration_days ?? '—' }}</td>
-            <td class="text-ghost notes-cell">{{ entry.notes ?? '' }}</td>
-            <td>
-              <div class="row-actions">
-                <button class="btn-edit" @click="openEdit(entry)" title="Edit">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                </button>
-                <button class="btn-delete" @click="deleteEntry(entry.id)" title="Delete">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M18 6 6 18M6 6l12 12"/>
-                  </svg>
-                </button>
-              </div>
+            <td class="lc-period">
+              <span class="period-start">{{ fmtDate(entry.started_at) }}</span>
+              <span class="period-arrow">→</span>
+              <span class="period-end">{{ fmtDate(entry.ended_at) }}</span>
+            </td>
+            <td class="lc-r lc-days">{{ entry.duration_days ?? '—' }}</td>
+            <td class="lc-notes">{{ entry.notes ?? '' }}</td>
+            <td class="lc-act">
+              <button class="act-edit" @click="openEdit(entry)" title="Edit">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button class="act-del" @click="deleteEntry(entry.id)" title="Delete">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Modal -->
+    <!-- ── Modal ── -->
     <Teleport to="body">
-      <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-        <div class="modal">
-          <div class="modal-header">
-            <span>{{ editingEntry ? 'Edit Entry' : 'Log Outcome' }}</span>
-            <button class="modal-close" @click="showModal = false">✕</button>
+      <div v-if="showModal" class="modal-veil" @click.self="showModal = false">
+        <div class="modal-box">
+
+          <div class="modal-top">
+            <div class="modal-top-left">
+              <div class="modal-eyebrow">{{ editingEntry ? 'EDIT RECORD' : 'NEW RECORD' }}</div>
+              <div class="modal-top-title">{{ editingEntry ? 'Edit Entry' : 'Log Outcome' }}</div>
+            </div>
+            <button class="modal-x" @click="showModal = false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M18 6 6 18M6 6l12 12"/>
+              </svg>
+            </button>
           </div>
+
           <div class="modal-body">
-            <div class="form-row">
-              <label>Link to Challenge (optional)</label>
-              <select v-model="form.challenge_id" @change="onChallengeSelect">
+
+            <div class="field-row">
+              <label class="field-lbl">Link to Active Challenge</label>
+              <select v-model="form.challenge_id" @change="onChallengeSelect" class="field-ctrl">
                 <option value="">— None —</option>
                 <option v-for="row in challengeRows.filter(r => !r.is_master)" :key="row.id" :value="row.id">
                   {{ row.alias }} · {{ row.prop_firm }} · {{ row.phase }}
                 </option>
               </select>
             </div>
-            <div class="form-grid-2">
-              <div class="form-row">
-                <label>Account Alias *</label>
-                <input v-model="form.alias" placeholder="e.g. FTMO-001" />
+
+            <div class="field-grid-2">
+              <div class="field-row">
+                <label class="field-lbl">Account Alias *</label>
+                <input v-model="form.alias" class="field-ctrl" placeholder="e.g. FTMO-001" />
               </div>
-              <div class="form-row">
-                <label>Prop Firm *</label>
-                <input v-model="form.prop_firm" placeholder="e.g. FTMO" />
-              </div>
-            </div>
-            <div class="form-grid-2">
-              <div class="form-row">
-                <label>Phase *</label>
-                <input v-model="form.phase" placeholder="e.g. Phase 1" />
-              </div>
-              <div class="form-row">
-                <label>Outcome *</label>
-                <select v-model="form.outcome">
-                  <option>Passed</option>
-                  <option>Failed</option>
-                  <option>Abandoned</option>
-                </select>
+              <div class="field-row">
+                <label class="field-lbl">Prop Firm *</label>
+                <input v-model="form.prop_firm" class="field-ctrl" placeholder="e.g. FTMO" />
               </div>
             </div>
-            <div class="form-grid-3">
-              <div class="form-row">
-                <label>Starting Balance</label>
-                <input v-model="form.starting_balance" type="number" placeholder="10000" />
+
+            <div class="field-grid-2">
+              <div class="field-row">
+                <label class="field-lbl">Phase *</label>
+                <input v-model="form.phase" class="field-ctrl" placeholder="e.g. Phase 1" />
               </div>
-              <div class="form-row">
-                <label>Final Balance</label>
-                <input v-model="form.final_balance" type="number" placeholder="11000" />
-              </div>
-              <div class="form-row">
-                <label>Payout Received</label>
-                <input v-model="form.payout_received" type="number" placeholder="0" />
-              </div>
-            </div>
-            <div class="form-grid-2">
-              <div class="form-row">
-                <label>Started</label>
-                <input v-model="form.started_at" type="date" />
-              </div>
-              <div class="form-row">
-                <label>Ended</label>
-                <input v-model="form.ended_at" type="date" />
+              <div class="field-row">
+                <label class="field-lbl">Outcome *</label>
+                <div class="outcome-toggle">
+                  <button
+                    v-for="o in ['Passed', 'Failed', 'Abandoned']"
+                    :key="o"
+                    type="button"
+                    class="ot-btn"
+                    :class="['ot-' + o.toLowerCase(), form.outcome === o ? 'ot-active' : '']"
+                    @click="form.outcome = o as any"
+                  >{{ o }}</button>
+                </div>
               </div>
             </div>
-            <div class="form-row">
-              <label>Notes</label>
-              <textarea v-model="form.notes" rows="2" placeholder="Optional notes..." />
+
+            <div class="field-grid-3">
+              <div class="field-row">
+                <label class="field-lbl">Starting Balance</label>
+                <input v-model="form.starting_balance" type="number" class="field-ctrl" placeholder="10000" />
+              </div>
+              <div class="field-row">
+                <label class="field-lbl">Final Balance</label>
+                <input v-model="form.final_balance" type="number" class="field-ctrl" placeholder="11000" />
+              </div>
+              <div class="field-row">
+                <label class="field-lbl">Payout Received</label>
+                <input v-model="form.payout_received" type="number" class="field-ctrl" placeholder="0" />
+              </div>
+            </div>
+
+            <div class="field-grid-2">
+              <div class="field-row">
+                <label class="field-lbl">Started</label>
+                <input v-model="form.started_at" type="date" class="field-ctrl" />
+              </div>
+              <div class="field-row">
+                <label class="field-lbl">Ended</label>
+                <input v-model="form.ended_at" type="date" class="field-ctrl" />
+              </div>
+            </div>
+
+            <div class="field-row">
+              <label class="field-lbl">Notes</label>
+              <textarea v-model="form.notes" rows="2" class="field-ctrl field-textarea" placeholder="Optional notes..." />
             </div>
           </div>
-          <div class="modal-footer">
-            <button class="btn-cancel" @click="showModal = false">Cancel</button>
-            <button class="btn-save" @click="save">{{ editingEntry ? 'Save' : 'Log' }}</button>
+
+          <div class="modal-foot">
+            <button class="mf-cancel" @click="showModal = false">Cancel</button>
+            <button class="mf-save" @click="save">
+              {{ editingEntry ? 'Save Changes' : 'Log Entry' }}
+            </button>
           </div>
         </div>
       </div>
@@ -422,379 +481,681 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.history-view {
-  padding: 24px 28px;
+/* ── Page shell ─────────────────────────────────────────────── */
+.hv {
+  padding: 28px 28px 100px;
   max-width: 1440px;
   margin: 0 auto;
-  animation: fadeInUp 0.35s var(--ease-out);
-}
-
-.page-header {
-  margin-bottom: 16px;
-}
-
-.page-title-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  flex-direction: column;
+  gap: 16px;
+  animation: hv-enter 0.35s ease both;
 }
 
-.page-title-row h1 {
-  font-family: var(--font-ui);
-  font-size: 22px;
+@keyframes hv-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Top bar ─────────────────────────────────────────────────── */
+.hv-topbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hv-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
   font-weight: 700;
+  letter-spacing: 0.22em;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.hv-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 26px;
+  font-weight: 800;
   color: var(--text-primary);
   margin: 0;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
 }
 
-.btn-add {
-  padding: 7px 16px;
-  background: var(--accent-muted);
-  border: 1px solid rgba(240, 180, 41, 0.2);
-  border-radius: var(--radius-sm);
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
+.hv-log-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #0a0b0f;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: opacity 0.15s, transform 0.1s;
+  flex-shrink: 0;
 }
 
-.btn-add:hover {
-  background: rgba(240, 180, 41, 0.15);
-  border-color: rgba(240, 180, 41, 0.35);
+.hv-log-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.hv-log-btn:active { transform: translateY(0); }
+
+.log-btn-plus {
+  font-size: 16px;
+  line-height: 1;
+  margin-top: -1px;
 }
 
-/* ── Stats strip ── */
-.stats-strip {
+/* ── Scoreboard ──────────────────────────────────────────────── */
+.scoreboard {
+  position: relative;
   display: flex;
   align-items: stretch;
   background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   overflow: hidden;
 }
 
-.stat-cell {
+/* Win progress bar along the bottom */
+.sb-win-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255,255,255,0.04);
+}
+
+.sb-win-fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 0.8s cubic-bezier(0.23, 1, 0.32, 1);
+  opacity: 0.7;
+}
+
+.sb-cell {
   flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: center;
   gap: 3px;
-  padding: 14px 18px;
+  padding: 16px 20px;
+  min-width: 0;
 }
 
-.stat-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-}
+.sb-cell--wide { flex: 1.6; }
 
-.stat-value {
-  font-family: var(--font-mono);
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.03em;
-}
-
-.stat-value.green  { color: var(--green); }
-.stat-value.red    { color: var(--red); }
-.stat-value.cyan   { color: var(--cyan); }
-
-.stat-divider {
+.sb-sep {
   width: 1px;
-  background: var(--border-subtle);
-  margin: 10px 0;
+  background: var(--border);
+  margin: 14px 0;
   flex-shrink: 0;
 }
 
-/* ── Suggestions ── */
-.suggestions {
+.sb-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.sb-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.sb-unit {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.6;
+}
+
+.sb-green  { color: var(--green); }
+.sb-red    { color: var(--red); }
+.sb-accent { color: var(--accent); }
+
+/* ── Alert banner ────────────────────────────────────────────── */
+.alert-banner {
   background: var(--surface);
-  border: 1px solid rgba(240, 180, 41, 0.15);
-  border-radius: var(--radius-md);
-  margin-bottom: 14px;
+  border: 1px solid rgba(240, 180, 41, 0.2);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
   overflow: hidden;
 }
 
-.suggestions-header {
+.alert-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--accent);
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--accent-muted);
+  padding: 9px 14px;
+  background: rgba(240, 180, 41, 0.05);
+  border-bottom: 1px solid rgba(240, 180, 41, 0.1);
 }
 
-.suggestion-row {
+.alert-pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-alert 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse-alert {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.alert-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--accent);
+}
+
+.alert-count {
+  margin-left: auto;
+  width: 18px;
+  height: 18px;
+  background: var(--accent);
+  color: #0a0b0f;
+  border-radius: 50%;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.alert-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
   font-size: 13px;
 }
 
-.suggestion-row:last-child { border-bottom: none; }
+.alert-row:last-child { border-bottom: none; }
 
-.suggest-alias {
-  font-weight: 600;
+.alert-outcome {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--green);
+  background: rgba(0, 230, 118, 0.1);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+  border-radius: 3px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.alert-alias {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
-.suggest-meta {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.suggest-note {
-  color: var(--text-tertiary);
+.alert-meta {
+  font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
-  font-family: var(--font-mono);
+  color: var(--text-muted);
   flex: 1;
 }
 
-.btn-confirm {
-  padding: 4px 12px;
-  background: var(--accent-muted);
-  border: 1px solid rgba(240, 180, 41, 0.2);
-  border-radius: var(--radius-sm);
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
+.alert-confirm-btn {
+  padding: 5px 12px;
+  background: var(--accent);
+  border: none;
+  border-radius: 4px;
+  color: #0a0b0f;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
   cursor: pointer;
+  transition: opacity 0.15s;
   white-space: nowrap;
 }
 
-/* ── Table ── */
-.table-wrap {
+.alert-confirm-btn:hover { opacity: 0.85; }
+
+/* ── Ledger table ────────────────────────────────────────────── */
+.ledger-wrap {
   background: var(--surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   overflow-x: auto;
 }
 
-.history-table {
+.ledger-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 72px 24px;
+  color: var(--text-muted);
+}
+
+.ledger-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.ledger-empty-icon {
+  font-size: 36px;
+  opacity: 0.12;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.ledger-empty-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ledger-empty-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ledger {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
 }
 
-.history-table th {
+/* Head */
+.ledger-head {
+  border-bottom: 1px solid var(--border);
+}
+
+.ledger-head th {
   padding: 10px 14px;
   text-align: left;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--text-tertiary);
-  border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
   white-space: nowrap;
+  background: rgba(255,255,255,0.015);
 }
 
-.history-table td {
+.lh-r { text-align: right; }
+.lh-status { width: 72px; }
+.lh-days { width: 52px; }
+.lh-notes { max-width: 160px; }
+.lh-act { width: 64px; }
+
+/* Rows */
+.ledger-row {
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  border-left: 3px solid transparent;
+  animation: row-enter 0.35s ease both;
+  transition: background 0.12s, border-left-color 0.15s;
+}
+
+@keyframes row-enter {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.ledger-row:last-child { border-bottom: none; }
+
+.row-passed  { border-left-color: rgba(0, 230, 118, 0.5); }
+.row-failed  { border-left-color: rgba(255, 71, 87, 0.5); }
+.row-abandoned { border-left-color: rgba(255, 159, 67, 0.5); }
+
+.row-passed:hover  { background: rgba(0, 230, 118, 0.04); border-left-color: var(--green); }
+.row-failed:hover  { background: rgba(255, 71, 87, 0.04); border-left-color: var(--red); }
+.row-abandoned:hover { background: rgba(255, 159, 67, 0.04); border-left-color: rgba(255,159,67,0.9); }
+
+/* Cells */
+.ledger-row td {
   padding: 11px 14px;
-  border-bottom: 1px solid var(--border-subtle);
-  color: var(--text-primary);
+  font-size: 12px;
+  color: var(--text-secondary);
   white-space: nowrap;
+  vertical-align: middle;
 }
 
-.history-table tbody tr:last-child td { border-bottom: none; }
-.history-table tbody tr { animation: fadeInUp 0.3s var(--ease-out) both; transition: background 0.12s; }
-.history-table tbody tr:hover { background: var(--surface-hover); }
+.lc-status {
+  padding: 8px 14px;
+}
 
-.text-right { text-align: right; }
-.text-secondary { color: var(--text-secondary); }
-.text-ghost { color: var(--text-tertiary); }
-.text-green { color: var(--green); font-weight: 600; }
-.mono { font-family: var(--font-mono); font-size: 12px; }
-.mono-sm { font-family: var(--font-mono); font-size: 11px; }
-.th-actions { width: 60px; }
-
-.alias-cell { font-weight: 600; }
-.notes-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
-
-/* ── Outcome chips ── */
-.outcome-chip {
+.status-pill {
   display: inline-flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 3px 7px;
   border-radius: 3px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
 }
 
-.outcome-passed {
-  background: rgba(0, 230, 118, 0.12);
-  color: var(--green);
+.pill-passed {
+  background: rgba(0, 230, 118, 0.1);
   border: 1px solid rgba(0, 230, 118, 0.25);
+  color: var(--green);
 }
 
-.outcome-failed {
+.pill-failed {
   background: rgba(255, 71, 87, 0.1);
+  border: 1px solid rgba(255, 71, 87, 0.22);
   color: var(--red);
-  border: 1px solid rgba(255, 71, 87, 0.2);
 }
 
-.outcome-abandoned {
+.pill-abandoned {
   background: rgba(255, 159, 67, 0.08);
-  color: var(--orange);
   border: 1px solid rgba(255, 159, 67, 0.2);
+  color: #ff9f43;
 }
 
-/* ── Row actions ── */
-.row-actions { display: flex; align-items: center; gap: 4px; }
+.lc-alias {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
 
-.btn-edit, .btn-delete {
-  width: 26px; height: 26px;
-  display: flex; align-items: center; justify-content: center;
+.lc-firm, .lc-phase {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.lc-r { text-align: right; }
+
+.lc-money {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.lc-pnl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.lc-pnl.pos { color: var(--green); }
+.lc-pnl.neg { color: var(--red); }
+
+.lc-payout {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+
+.lc-extracted {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.lc-period {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+.period-start, .period-end { color: var(--text-muted); }
+.period-arrow { color: var(--border); font-size: 9px; }
+
+.lc-days {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.lc-notes {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Row actions */
+.lc-act {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 10px;
+}
+
+.act-edit, .act-del {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-tertiary);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: transparent;
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.btn-edit:hover  { background: var(--purple-muted); border-color: rgba(165, 94, 234, 0.2); color: var(--purple); }
-.btn-delete:hover { background: var(--red-muted); border-color: rgba(255, 71, 87, 0.2); color: var(--red); }
-
-/* ── Empty ── */
-.empty-state {
-  text-align: center;
-  padding: 52px 20px;
-  color: var(--text-tertiary);
-  font-size: 13px;
+.ledger-row:hover .act-edit,
+.ledger-row:hover .act-del {
+  border-color: var(--border);
+  color: var(--text-muted);
 }
 
-/* ── Modal ── */
-.modal-overlay {
-  position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  display: flex; align-items: center; justify-content: center;
+.act-edit:hover { border-color: rgba(99,179,237,0.3) !important; color: #63b3ed !important; background: rgba(99,179,237,0.07); }
+.act-del:hover  { border-color: rgba(255,71,87,0.3) !important; color: var(--red) !important; background: rgba(255,71,87,0.07); }
+
+/* ── Modal ───────────────────────────────────────────────────── */
+.modal-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
 }
 
-.modal {
+.modal-box {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  animation: fadeInUp 0.2s var(--ease-out);
+  animation: modal-enter 0.2s ease both;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6);
 }
 
-.modal-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-subtle);
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
+@keyframes modal-enter {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-eyebrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  margin-bottom: 3px;
+}
+
+.modal-top-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
-.modal-close {
-  background: none; border: none;
-  color: var(--text-tertiary); cursor: pointer; font-size: 14px;
-  padding: 2px 6px;
+.modal-x {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
 }
 
-.modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.modal-x:hover { border-color: var(--red); color: var(--red); }
 
-.form-row { display: flex; flex-direction: column; gap: 6px; }
-.form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
 
-.form-row label {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 600;
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+.field-lbl {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--text-tertiary);
 }
 
-.form-row input,
-.form-row select,
-.form-row textarea {
+.field-ctrl {
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
+  border-radius: 6px;
+  padding: 9px 11px;
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
   width: 100%;
   box-sizing: border-box;
+  outline: none;
   transition: border-color 0.15s;
 }
 
-.form-row input:focus,
-.form-row select:focus,
-.form-row textarea:focus {
-  outline: none;
-  border-color: var(--accent);
+.field-ctrl:focus { border-color: var(--accent); }
+
+.field-textarea { resize: vertical; min-height: 60px; }
+
+/* Outcome toggle */
+.outcome-toggle {
+  display: flex;
+  gap: 4px;
 }
 
-.modal-footer {
-  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
-  padding: 14px 20px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.btn-cancel {
-  padding: 7px 16px;
-  background: transparent;
+.ot-btn {
+  flex: 1;
+  padding: 8px 6px;
+  background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.btn-save {
-  padding: 7px 20px;
-  background: var(--accent-muted);
-  border: 1px solid rgba(240, 180, 41, 0.25);
-  border-radius: var(--radius-sm);
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 12px;
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s;
 }
 
-.btn-save:hover {
-  background: rgba(240, 180, 41, 0.15);
+.ot-btn.ot-active.ot-passed  { background: rgba(0,230,118,0.1); border-color: rgba(0,230,118,0.35); color: var(--green); }
+.ot-btn.ot-active.ot-failed  { background: rgba(255,71,87,0.1); border-color: rgba(255,71,87,0.3); color: var(--red); }
+.ot-btn.ot-active.ot-abandoned { background: rgba(255,159,67,0.1); border-color: rgba(255,159,67,0.3); color: #ff9f43; }
+
+.modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
 }
 
-@media (max-width: 640px) {
-  .history-view { padding: 16px 12px; }
-  .form-grid-2, .form-grid-3 { grid-template-columns: 1fr; }
-  .stats-strip { flex-wrap: wrap; }
-  .stat-cell { flex: 1 1 45%; border-bottom: 1px solid var(--border-subtle); }
-  .stat-divider { display: none; }
+.mf-cancel {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.mf-cancel:hover { border-color: var(--text-muted); }
+
+.mf-save {
+  padding: 8px 20px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #0a0b0f;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.mf-save:hover { opacity: 0.88; }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .hv { padding: 16px 14px 80px; }
+  .scoreboard { flex-wrap: wrap; }
+  .sb-cell { flex: 1 1 40%; }
+  .sb-sep { display: none; }
+  .field-grid-2, .field-grid-3 { grid-template-columns: 1fr; }
 }
 </style>

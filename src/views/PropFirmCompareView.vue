@@ -62,10 +62,20 @@ async function load() {
 
 onMounted(load)
 
+// Weighted score: rating × log(reviews + 1) so high-rated-but-few-reviews
+// firms don't outrank well-reviewed firms with a slightly lower rating
+function firmScore(f: PropFirm): number {
+  return (f.rating ?? 0) * Math.log10((f.reviews_count ?? 0) + 10)
+}
+
+function sortFirms(list: PropFirm[]) {
+  return [...list].sort((a, b) => firmScore(b) - firmScore(a))
+}
+
 const searchResults = computed(() => {
-  if (!search.value.trim()) return firms.value
+  if (!search.value.trim()) return sortFirms(firms.value)
   const q = search.value.toLowerCase()
-  return firms.value.filter(f => f.name.toLowerCase().includes(q))
+  return sortFirms(firms.value.filter(f => f.name.toLowerCase().includes(q)))
 })
 
 function isSelected(firm: PropFirm) {
@@ -305,7 +315,6 @@ function isBestCell(row: RowDef, firm: PropFirm): boolean {
               <th>Rating</th>
               <th>Reviews</th>
               <th>Split</th>
-              <th>Fee $10k</th>
               <th>Phases</th>
               <th class="ft-action" />
             </tr>
@@ -349,10 +358,6 @@ function isBestCell(row: RowDef, firm: PropFirm): boolean {
               </td>
               <td>
                 <span v-if="firm.profit_split_pct" class="split-pct">{{ firm.profit_split_pct }}%</span>
-                <span v-else class="cell-muted-text">—</span>
-              </td>
-              <td>
-                <span v-if="firm.fee_10k" class="fee-text">${{ firm.fee_10k }}</span>
                 <span v-else class="cell-muted-text">—</span>
               </td>
               <td>

@@ -2,11 +2,12 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
+import { supabase } from '@/lib/supabase'
 
 const { signIn, signUp } = useAuth()
 const router = useRouter()
 
-type Mode = 'login' | 'register'
+type Mode = 'login' | 'register' | 'forgot'
 const mode = ref<Mode>('login')
 const email = ref('')
 const password = ref('')
@@ -18,6 +19,22 @@ const info = ref('')
 async function submit() {
   error.value = ''
   info.value = ''
+
+  if (mode.value === 'forgot') {
+    if (!email.value) { error.value = 'Email required'; return }
+    loading.value = true
+    try {
+      const redirectTo = window.location.origin + import.meta.env.BASE_URL + 'reset-password'
+      const { error: e } = await supabase.auth.resetPasswordForEmail(email.value, { redirectTo })
+      if (e) throw e
+      info.value = 'Check your email for a password reset link.'
+    } catch (e: any) {
+      error.value = e.message ?? 'Something went wrong'
+    } finally {
+      loading.value = false
+    }
+    return
+  }
 
   if (!email.value || !password.value) {
     error.value = 'Email and password required'
@@ -71,14 +88,37 @@ function switchMode(m: Mode) {
         <span class="login-brand">CHALLENGE TRACKER</span>
       </div>
 
-      <!-- Mode tabs -->
-      <div class="mode-tabs">
+      <!-- Mode tabs — hidden in forgot mode -->
+      <div v-if="mode !== 'forgot'" class="mode-tabs">
         <button :class="['tab', mode === 'login' ? 'tab-active' : '']" @click="switchMode('login')">Sign In</button>
         <button :class="['tab', mode === 'register' ? 'tab-active' : '']" @click="switchMode('register')">Register</button>
       </div>
 
+      <!-- Forgot password panel -->
+      <div v-if="mode === 'forgot'" class="forgot-panel">
+        <button type="button" class="forgot-back" @click="switchMode('login')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M19 12H5M12 5l-7 7 7 7"/>
+          </svg>
+          Back to sign in
+        </button>
+        <div class="forgot-info">
+          <div class="forgot-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.8">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </div>
+          <div>
+            <div class="forgot-title">Reset Password</div>
+            <div class="forgot-sub">Enter your email and we'll send a reset link.</div>
+          </div>
+        </div>
+      </div>
+
       <!-- Form -->
       <form class="login-form" @submit.prevent="submit">
+
         <div class="field">
           <label class="field-label">EMAIL</label>
           <input
@@ -91,7 +131,7 @@ function switchMode(m: Mode) {
           />
         </div>
 
-        <div class="field">
+        <div v-if="mode !== 'forgot'" class="field">
           <label class="field-label">PASSWORD</label>
           <input
             v-model="password"
@@ -119,7 +159,11 @@ function switchMode(m: Mode) {
 
         <button type="submit" class="submit-btn" :disabled="loading">
           <span v-if="loading" class="spinner" />
-          <span>{{ mode === 'login' ? 'Sign In' : 'Create Account' }}</span>
+          <span>{{ mode === 'login' ? 'Sign In' : mode === 'register' ? 'Create Account' : 'Send Reset Link' }}</span>
+        </button>
+
+        <button v-if="mode === 'login'" type="button" class="forgot-link" @click="switchMode('forgot')">
+          Forgot password?
         </button>
       </form>
     </div>
@@ -288,4 +332,92 @@ function switchMode(m: Mode) {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.forgot-link {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  cursor: pointer;
+  text-align: center;
+  padding: 0;
+  transition: color 0.15s;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+
+.forgot-link:hover {
+  color: var(--text-secondary);
+  text-decoration-color: var(--text-muted);
+}
+
+/* ── Forgot panel ── */
+.forgot-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.forgot-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 6px 12px;
+  color: var(--text-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  align-self: flex-start;
+}
+
+.forgot-back:hover {
+  color: var(--text-secondary);
+  border-color: var(--text-muted);
+}
+
+.forgot-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(240, 180, 41, 0.05);
+  border: 1px solid rgba(240, 180, 41, 0.15);
+  border-radius: 8px;
+}
+
+.forgot-icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(240, 180, 41, 0.08);
+  border: 1px solid rgba(240, 180, 41, 0.2);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.forgot-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px;
+}
+
+.forgot-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
 </style>

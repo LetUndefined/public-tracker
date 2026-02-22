@@ -4,6 +4,7 @@ import App from './App.vue'
 import './style.css'
 
 import LoginView from './views/LoginView.vue'
+import ResetPasswordView from './views/ResetPasswordView.vue'
 import SettingsView from './views/SettingsView.vue'
 import AdminView from './views/AdminView.vue'
 import ChallengesView from './views/ChallengesView.vue'
@@ -18,6 +19,7 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: '/login', component: LoginView, meta: { public: true } },
+    { path: '/reset-password', component: ResetPasswordView, meta: { public: true } },
     { path: '/', component: ChallengesView },
     { path: '/notifications', component: NotificationsView },
     { path: '/analytics', component: AnalyticsView },
