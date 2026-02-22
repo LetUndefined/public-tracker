@@ -41,6 +41,9 @@ interface PropFirm {
   notes: string | null
 }
 
+// Accent color per selection slot
+const FIRM_COLORS = ['#22d3ee', '#f59e0b', '#a855f7'] // cyan, amber, violet
+
 const firms = ref<PropFirm[]>([])
 const loading = ref(false)
 const search = ref('')
@@ -60,13 +63,17 @@ async function load() {
 onMounted(load)
 
 const searchResults = computed(() => {
-  if (!search.value.trim()) return firms.value.slice(0, 12)
+  if (!search.value.trim()) return firms.value
   const q = search.value.toLowerCase()
-  return firms.value.filter(f => f.name.toLowerCase().includes(q)).slice(0, 12)
+  return firms.value.filter(f => f.name.toLowerCase().includes(q))
 })
 
 function isSelected(firm: PropFirm) {
   return selected.value.some(s => s.id === firm.id)
+}
+
+function firmIndex(firm: PropFirm) {
+  return selected.value.findIndex(s => s.id === firm.id)
 }
 
 function toggle(firm: PropFirm) {
@@ -81,140 +88,356 @@ function remove(firm: PropFirm) {
   selected.value = selected.value.filter(s => s.id !== firm.id)
 }
 
-function fmt(val: boolean | null, yes = 'Yes', no = 'No') {
-  if (val === null) return '—'
-  return val ? yes : no
+// ── Value rendering ──────────────────────────────────────────
+type CellType = 'bool-good' | 'bool-neutral' | 'bool-bad' | 'number' | 'fee' | 'text' | 'drawdown' | 'consistency'
+
+interface RowDef {
+  label: string
+  section?: string
+  type: CellType
+  value: (f: PropFirm) => string | number | boolean | null
+  suffix?: string
+  bestFn?: (vals: (number | null)[]) => number | null // returns best raw value
 }
 
-function fmtNum(val: number | null, suffix = '') {
-  if (val === null || val === undefined) return '—'
-  return `${val}${suffix}`
+function bestMin(vals: (number | null)[]): number | null {
+  const nums = vals.filter(v => v !== null) as number[]
+  return nums.length ? Math.min(...nums) : null
+}
+function bestMax(vals: (number | null)[]): number | null {
+  const nums = vals.filter(v => v !== null) as number[]
+  return nums.length ? Math.max(...nums) : null
 }
 
-const rows: { label: string; key: (f: PropFirm) => string }[] = [
-  { label: 'Rating', key: f => fmtNum(f.rating) },
-  { label: 'Reviews', key: f => fmtNum(f.reviews_count) },
-  { label: 'Phases', key: f => f.instant_funding ? 'Instant' : fmtNum(f.phases) },
-  { label: 'Profit Target P1', key: f => fmtNum(f.profit_target_p1, '%') },
-  { label: 'Profit Target P2', key: f => fmtNum(f.profit_target_p2, '%') },
-  { label: 'Min Trading Days', key: f => fmtNum(f.min_trading_days, ' days') },
-  { label: 'Max Trading Days', key: f => fmtNum(f.max_trading_days, ' days') },
-  { label: 'Drawdown Type', key: f => f.drawdown_type ?? '—' },
-  { label: 'Max Daily Loss', key: f => fmtNum(f.max_daily_loss_pct, '%') },
-  { label: 'Max Total Loss', key: f => fmtNum(f.max_total_loss_pct, '%') },
-  { label: 'Profit Split', key: f => fmtNum(f.profit_split_pct, '%') },
-  { label: 'Payout Frequency', key: f => f.payout_frequency ?? '—' },
-  { label: 'Fee $10k', key: f => f.fee_10k ? `$${f.fee_10k}` : '—' },
-  { label: 'Fee $25k', key: f => f.fee_25k ? `$${f.fee_25k}` : '—' },
-  { label: 'Fee $50k', key: f => f.fee_50k ? `$${f.fee_50k}` : '—' },
-  { label: 'Fee $100k', key: f => f.fee_100k ? `$${f.fee_100k}` : '—' },
-  { label: 'EA Allowed', key: f => fmt(f.ea_allowed) },
-  { label: 'Copy Trading', key: f => fmt(f.copy_trading_allowed) },
-  { label: 'News Trading', key: f => fmt(f.news_trading_allowed) },
-  { label: 'Weekend Holding', key: f => fmt(f.weekend_holding) },
-  { label: 'Overnight Holding', key: f => fmt(f.overnight_holding) },
-  { label: 'Consistency Rule', key: f => fmt(f.consistency_rule, 'Required', 'None') },
-  { label: 'Multiple Accounts', key: f => fmt(f.multiple_accounts) },
-  { label: 'Forex', key: f => fmt(f.forex) },
-  { label: 'Crypto', key: f => fmt(f.crypto) },
-  { label: 'Indices', key: f => fmt(f.indices) },
-  { label: 'Commodities', key: f => fmt(f.commodities) },
-  { label: 'Futures', key: f => fmt(f.futures) },
-  { label: 'MT4', key: f => fmt(f.mt4) },
-  { label: 'MT5', key: f => fmt(f.mt5) },
-  { label: 'cTrader', key: f => fmt(f.ctrader) },
+const sections: { label: string; rows: RowDef[] }[] = [
+  {
+    label: 'OVERVIEW',
+    rows: [
+      { label: 'Rating', type: 'number', value: f => f.rating, bestFn: bestMax },
+      { label: 'Reviews', type: 'number', value: f => f.reviews_count, bestFn: bestMax },
+      { label: 'Phases / Funding', type: 'text', value: f => f.instant_funding ? 'Instant' : f.phases != null ? `${f.phases} Phase${f.phases > 1 ? 's' : ''}` : '—' },
+    ],
+  },
+  {
+    label: 'TARGETS',
+    rows: [
+      { label: 'Profit Target P1', type: 'number', suffix: '%', value: f => f.profit_target_p1, bestFn: bestMin },
+      { label: 'Profit Target P2', type: 'number', suffix: '%', value: f => f.profit_target_p2, bestFn: bestMin },
+      { label: 'Min Trading Days', type: 'number', suffix: 'd', value: f => f.min_trading_days, bestFn: bestMin },
+      { label: 'Max Trading Days', type: 'number', suffix: 'd', value: f => f.max_trading_days, bestFn: bestMax },
+    ],
+  },
+  {
+    label: 'RISK',
+    rows: [
+      { label: 'Drawdown Type', type: 'drawdown', value: f => f.drawdown_type },
+      { label: 'Max Daily Loss', type: 'number', suffix: '%', value: f => f.max_daily_loss_pct, bestFn: bestMax },
+      { label: 'Max Total Loss', type: 'number', suffix: '%', value: f => f.max_total_loss_pct, bestFn: bestMax },
+      { label: 'Consistency Rule', type: 'consistency', value: f => f.consistency_rule },
+    ],
+  },
+  {
+    label: 'FINANCIALS',
+    rows: [
+      { label: 'Profit Split', type: 'number', suffix: '%', value: f => f.profit_split_pct, bestFn: bestMax },
+      { label: 'Payout Frequency', type: 'text', value: f => f.payout_frequency ?? '—' },
+      { label: 'Fee $10k', type: 'fee', value: f => f.fee_10k, bestFn: bestMin },
+      { label: 'Fee $25k', type: 'fee', value: f => f.fee_25k, bestFn: bestMin },
+      { label: 'Fee $50k', type: 'fee', value: f => f.fee_50k, bestFn: bestMin },
+      { label: 'Fee $100k', type: 'fee', value: f => f.fee_100k, bestFn: bestMin },
+    ],
+  },
+  {
+    label: 'RULES',
+    rows: [
+      { label: 'EA / Robots', type: 'bool-good', value: f => f.ea_allowed },
+      { label: 'Copy Trading', type: 'bool-good', value: f => f.copy_trading_allowed },
+      { label: 'News Trading', type: 'bool-good', value: f => f.news_trading_allowed },
+      { label: 'Weekend Holding', type: 'bool-good', value: f => f.weekend_holding },
+      { label: 'Overnight Holding', type: 'bool-good', value: f => f.overnight_holding },
+      { label: 'Multiple Accounts', type: 'bool-good', value: f => f.multiple_accounts },
+    ],
+  },
+  {
+    label: 'MARKETS',
+    rows: [
+      { label: 'Forex', type: 'bool-neutral', value: f => f.forex },
+      { label: 'Crypto', type: 'bool-neutral', value: f => f.crypto },
+      { label: 'Indices', type: 'bool-neutral', value: f => f.indices },
+      { label: 'Commodities', type: 'bool-neutral', value: f => f.commodities },
+      { label: 'Futures', type: 'bool-neutral', value: f => f.futures },
+    ],
+  },
+  {
+    label: 'PLATFORMS',
+    rows: [
+      { label: 'MT4', type: 'bool-neutral', value: f => f.mt4 },
+      { label: 'MT5', type: 'bool-neutral', value: f => f.mt5 },
+      { label: 'cTrader', type: 'bool-neutral', value: f => f.ctrader },
+    ],
+  },
 ]
+
+function renderValue(row: RowDef, firm: PropFirm): string {
+  const v = row.value(firm)
+  if (v === null || v === undefined) return '—'
+  if (row.type === 'fee') return v !== null ? `$${v}` : '—'
+  if (row.type === 'number') return v !== null ? `${v}${row.suffix ?? ''}` : '—'
+  return String(v)
+}
+
+function cellClass(row: RowDef, firm: PropFirm, isBest: boolean): string {
+  const v = row.value(firm)
+  const classes: string[] = []
+  if (isBest) classes.push('cell-best')
+  if (v === null || v === undefined) return classes.join(' ')
+
+  if (row.type === 'bool-good') {
+    classes.push(v === true ? 'cell-green' : v === false ? 'cell-red' : '')
+  } else if (row.type === 'bool-neutral') {
+    classes.push(v === true ? 'cell-green' : 'cell-muted')
+  } else if (row.type === 'drawdown') {
+    const s = String(v).toLowerCase()
+    if (s.includes('static')) classes.push('cell-green')
+    else if (s.includes('trail')) classes.push('cell-amber')
+  } else if (row.type === 'consistency') {
+    classes.push(v === true ? 'cell-amber' : v === false ? 'cell-green' : '')
+  }
+  return classes.filter(Boolean).join(' ')
+}
+
+function cellText(row: RowDef, firm: PropFirm): string {
+  const v = row.value(firm)
+  if (row.type === 'bool-good' || row.type === 'bool-neutral') {
+    if (v === true) return '✓'
+    if (v === false) return '✗'
+    return '—'
+  }
+  if (row.type === 'consistency') {
+    if (v === true) return 'Required'
+    if (v === false) return 'None'
+    return '—'
+  }
+  if (row.type === 'drawdown') {
+    if (!v) return '—'
+    const s = String(v)
+    return s.charAt(0).toUpperCase() + s.slice(1)
+  }
+  return renderValue(row, firm)
+}
+
+// Returns 'full' | 'half' | 'empty' for each of the 5 star dots
+function starState(rating: number, n: number): 'full' | 'half' | 'empty' {
+  if (n <= Math.floor(rating)) return 'full'
+  if (n === Math.ceil(rating) && rating % 1 >= 0.25) return 'half'
+  return 'empty'
+}
+
+function getBestValue(row: RowDef): number | null {
+  if (!row.bestFn) return null
+  const vals = selected.value.map(f => {
+    const v = row.value(f)
+    return typeof v === 'number' ? v : null
+  })
+  return row.bestFn(vals)
+}
+
+function isBestCell(row: RowDef, firm: PropFirm): boolean {
+  if (!row.bestFn) return false
+  const best = getBestValue(row)
+  if (best === null) return false
+  const v = row.value(firm)
+  return v === best
+}
 </script>
 
 <template>
-  <div class="compare-view">
-    <div class="compare-header">
-      <div class="compare-title">
-        <span class="compare-label">COMPARE</span>
-        <h1>Prop Firms</h1>
+  <div class="cpv">
+    <!-- Header -->
+    <div class="cpv-header">
+      <div>
+        <div class="cpv-eyebrow">INTELLIGENCE</div>
+        <h1 class="cpv-title">Compare Prop Firms</h1>
       </div>
-      <p class="compare-sub">Select up to 3 prop firms to compare side by side</p>
+      <p class="cpv-sub">Select up to 3 firms · data updates periodically</p>
     </div>
 
-    <!-- Selection area -->
-    <div class="selection-area">
-      <div class="search-wrap">
-        <svg class="search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <circle cx="5.5" cy="5.5" r="4" stroke="currentColor" stroke-width="1.4"/>
-          <path d="M8.5 8.5L12 12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-        </svg>
-        <input
-          v-model="search"
-          class="search-input"
-          placeholder="Search prop firms..."
-          autocomplete="off"
-        />
+    <!-- Firm picker -->
+    <div class="picker">
+      <div class="picker-top">
+        <div class="picker-search-wrap">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none" class="picker-search-icon">
+            <circle cx="5" cy="5" r="3.5" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M8 8L11.5 11.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+          </svg>
+          <input v-model="search" class="picker-search" placeholder="Filter firms..." autocomplete="off" />
+        </div>
+        <div class="picker-slots">
+          <div
+            v-for="(slot, i) in 3"
+            :key="i"
+            class="picker-slot"
+            :class="{ filled: !!selected[i] }"
+            :style="selected[i] ? { '--slot-color': FIRM_COLORS[i] } : {}"
+          >
+            <template v-if="selected[i]">
+              <span class="slot-dot" />
+              <span class="slot-name">{{ selected[i].name }}</span>
+              <button class="slot-remove" @click="remove(selected[i])">✕</button>
+            </template>
+            <template v-else>
+              <span class="slot-empty">Slot {{ i + 1 }}</span>
+            </template>
+          </div>
+        </div>
       </div>
 
-      <div v-if="loading" class="search-empty">Loading...</div>
-      <div v-else-if="firms.length === 0" class="search-empty">No prop firm data available</div>
-      <div v-else class="firm-list">
-        <button
-          v-for="firm in searchResults"
-          :key="firm.id"
-          class="firm-chip"
-          :class="{ selected: isSelected(firm), disabled: !isSelected(firm) && selected.length >= 3 }"
-          @click="toggle(firm)"
-        >
-          <span class="chip-name">{{ firm.name }}</span>
-          <span v-if="firm.rating" class="chip-rating">★ {{ firm.rating }}</span>
-          <span class="chip-action">{{ isSelected(firm) ? '✕' : '+' }}</span>
-        </button>
+      <!-- Firm table -->
+      <div v-if="loading" class="picker-loading">
+        <span class="loading-pulse" />Loading firms...
+      </div>
+      <div v-else-if="firms.length === 0" class="picker-loading">No prop firm data available</div>
+      <div v-else class="firm-table-wrap">
+        <table class="firm-table">
+          <thead>
+            <tr>
+              <th class="ft-name">Firm</th>
+              <th>Rating</th>
+              <th>Reviews</th>
+              <th>Split</th>
+              <th>Fee $10k</th>
+              <th>Phases</th>
+              <th class="ft-action" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="firm in searchResults"
+              :key="firm.id"
+              class="firm-row"
+              :class="{
+                'firm-row--selected': isSelected(firm),
+                'firm-row--disabled': !isSelected(firm) && selected.length >= 3
+              }"
+              :style="isSelected(firm) ? { '--row-color': FIRM_COLORS[firmIndex(firm)] } : {}"
+              @click="toggle(firm)"
+            >
+              <td class="ft-name">
+                <span class="row-sel-bar" />
+                <span class="row-name">{{ firm.name }}</span>
+                <span v-if="firm.instant_funding" class="badge-instant">INSTANT</span>
+              </td>
+              <td>
+                <span v-if="firm.rating" class="row-rating">
+                  <span class="rating-stars">
+                    <span
+                      v-for="n in 5"
+                      :key="n"
+                      class="star"
+                      :class="starState(firm.rating, n)"
+                    />
+                  </span>
+                  <span class="rating-num">{{ firm.rating }}</span>
+                </span>
+                <span v-else class="cell-muted-text">—</span>
+              </td>
+              <td>
+                <span v-if="firm.reviews_count" class="reviews-count">
+                  {{ firm.reviews_count.toLocaleString() }}
+                </span>
+                <span v-else class="cell-muted-text">—</span>
+              </td>
+              <td>
+                <span v-if="firm.profit_split_pct" class="split-pct">{{ firm.profit_split_pct }}%</span>
+                <span v-else class="cell-muted-text">—</span>
+              </td>
+              <td>
+                <span v-if="firm.fee_10k" class="fee-text">${{ firm.fee_10k }}</span>
+                <span v-else class="cell-muted-text">—</span>
+              </td>
+              <td>
+                <span class="phases-text">
+                  {{ firm.instant_funding ? 'Instant' : firm.phases != null ? `${firm.phases}` : '—' }}
+                </span>
+              </td>
+              <td class="ft-action">
+                <button class="add-btn" :class="{ added: isSelected(firm) }">
+                  {{ isSelected(firm) ? '✕' : '+' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
     <!-- Empty state -->
-    <div v-if="selected.length === 0" class="empty-compare">
-      <div class="empty-icon">⟷</div>
-      <p>Pick firms above to start comparing</p>
+    <div v-if="selected.length === 0" class="empty-state">
+      <div class="empty-arrows">⟵ &nbsp; ⟶</div>
+      <p>Select firms from the list above to compare</p>
     </div>
 
-    <!-- Comparison columns -->
-    <div v-else class="comparison-wrap">
-      <!-- Firm headers -->
-      <div class="comp-grid" :style="{ '--cols': selected.length }">
-        <div class="comp-row comp-header-row">
-          <div class="comp-label-col" />
+    <!-- Comparison grid -->
+    <div v-else class="comp-wrap">
+      <div class="comp-grid" :style="{ '--firm-count': selected.length }">
+
+        <!-- Sticky header row -->
+        <div class="comp-header">
+          <div class="comp-label-cell comp-header-spacer" />
           <div
-            v-for="firm in selected"
+            v-for="(firm, fi) in selected"
             :key="firm.id"
-            class="comp-firm-header"
+            class="comp-firm-cell"
+            :style="{ '--fc': FIRM_COLORS[fi] }"
           >
-            <div class="firm-header-name">{{ firm.name }}</div>
-            <a v-if="firm.website" :href="firm.website" target="_blank" rel="noopener" class="firm-header-link">
-              Visit site ↗
+            <div class="cfh-bar" />
+            <div class="cfh-name">{{ firm.name }}</div>
+            <a v-if="firm.website" :href="firm.website" target="_blank" rel="noopener" class="cfh-link">
+              Visit ↗
             </a>
-            <button class="firm-remove-btn" @click="remove(firm)" title="Remove">✕</button>
+            <div class="cfh-meta">
+              <span v-if="firm.rating" class="cfh-rating">★ {{ firm.rating }}</span>
+              <span v-if="firm.profit_split_pct" class="cfh-split">{{ firm.profit_split_pct }}% split</span>
+            </div>
+            <button class="cfh-remove" @click="remove(firm)">Remove</button>
           </div>
         </div>
 
-        <!-- Data rows -->
-        <div
-          v-for="(row, i) in rows"
-          :key="row.label"
-          class="comp-row"
-          :class="{ 'comp-row-alt': i % 2 === 1 }"
-        >
-          <div class="comp-label-col">{{ row.label }}</div>
-          <div
-            v-for="firm in selected"
-            :key="firm.id"
-            class="comp-value-col"
-          >{{ row.key(firm) }}</div>
-        </div>
+        <!-- Sections -->
+        <template v-for="section in sections" :key="section.label">
+          <!-- Section divider -->
+          <div class="comp-section-row">
+            <div class="comp-section-label">{{ section.label }}</div>
+            <div v-for="firm in selected" :key="firm.id" class="comp-section-fill" />
+          </div>
 
-        <!-- Notes row -->
-        <div v-if="selected.some(f => f.notes)" class="comp-row comp-notes-row">
-          <div class="comp-label-col">Notes</div>
+          <!-- Data rows -->
           <div
-            v-for="firm in selected"
+            v-for="row in section.rows"
+            :key="row.label"
+            class="comp-data-row"
+          >
+            <div class="comp-label-cell">{{ row.label }}</div>
+            <div
+              v-for="(firm, fi) in selected"
+              :key="firm.id"
+              class="comp-value-cell"
+              :class="cellClass(row, firm, isBestCell(row, firm))"
+              :style="{ '--fc': FIRM_COLORS[fi] }"
+            >
+              {{ cellText(row, firm) }}
+            </div>
+          </div>
+        </template>
+
+        <!-- Notes -->
+        <div v-if="selected.some(f => f.notes)" class="comp-data-row comp-notes-row">
+          <div class="comp-label-cell">Notes</div>
+          <div
+            v-for="(firm, fi) in selected"
             :key="firm.id"
-            class="comp-value-col comp-notes"
+            class="comp-value-cell comp-notes-cell"
+            :style="{ '--fc': FIRM_COLORS[fi] }"
           >{{ firm.notes ?? '—' }}</div>
         </div>
       </div>
@@ -223,69 +446,84 @@ const rows: { label: string; key: (f: PropFirm) => string }[] = [
 </template>
 
 <style scoped>
-.compare-view {
-  max-width: 1200px;
+/* ── Layout ─────────────────────────────────────────────────── */
+.cpv {
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 32px 24px 80px;
+  padding: 32px 24px 100px;
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
 }
 
-.compare-header {
+/* ── Header ─────────────────────────────────────────────────── */
+.cpv-header {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.compare-label {
+.cpv-eyebrow {
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.2em;
   color: var(--accent);
+  margin-bottom: 4px;
 }
 
-.compare-header h1 {
-  font-size: 22px;
+.cpv-title {
+  font-size: 24px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  letter-spacing: -0.02em;
 }
 
-.compare-sub {
-  font-size: 13px;
+.cpv-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: var(--text-muted);
   margin: 0;
+  padding-bottom: 4px;
 }
 
-/* Selection */
-.selection-area {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 20px;
+/* ── Picker ─────────────────────────────────────────────────── */
+.picker {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  overflow: hidden;
 }
 
-.search-wrap {
-  position: relative;
+.picker-top {
   display: flex;
+  gap: 12px;
   align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
 }
 
-.search-icon {
+.picker-search-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.picker-search-icon {
   position: absolute;
   left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--text-muted);
   pointer-events: none;
 }
 
-.search-input {
-  width: 100%;
-  padding: 8px 12px 8px 32px;
+.picker-search {
+  padding: 7px 12px 7px 30px;
+  width: 200px;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -296,193 +534,461 @@ const rows: { label: string; key: (f: PropFirm) => string }[] = [
   transition: border-color 0.15s;
 }
 
-.search-input:focus {
-  border-color: var(--accent);
-}
+.picker-search:focus { border-color: var(--accent); }
 
-.search-empty {
-  font-size: 13px;
-  color: var(--text-muted);
-  padding: 8px 0;
-  text-align: center;
-}
-
-.firm-list {
+.picker-slots {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
+  flex: 1;
+  flex-wrap: wrap;
 }
 
-.firm-chip {
+.picker-slot {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 10px;
-  background: var(--bg);
-  border: 1px solid var(--border);
+  padding: 5px 10px;
+  border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-family: var(--font-ui);
+  min-width: 120px;
   font-size: 12px;
-  color: var(--text-secondary);
-  transition: border-color 0.15s, background 0.15s, color 0.15s;
+  color: var(--text-muted);
+  transition: border-color 0.2s;
 }
 
-.firm-chip:hover:not(.disabled) {
-  border-color: var(--accent);
+.picker-slot.filled {
+  border-style: solid;
+  border-color: var(--slot-color);
+  background: color-mix(in srgb, var(--slot-color) 6%, transparent);
+}
+
+.slot-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--slot-color);
+  flex-shrink: 0;
+}
+
+.slot-name {
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }
 
-.firm-chip.selected {
-  border-color: var(--accent);
-  background: rgba(var(--accent-rgb, 99, 102, 241), 0.08);
-  color: var(--accent);
+.slot-remove {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  transition: color 0.15s;
+}
+.slot-remove:hover { color: var(--red); }
+
+.slot-empty {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
 }
 
-.firm-chip.disabled {
-  opacity: 0.35;
+/* ── Firm table ─────────────────────────────────────────────── */
+.picker-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.loading-pulse {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-live 1.4s ease-in-out infinite;
+}
+
+.firm-table-wrap {
+  overflow-y: auto;
+  max-height: 260px;
+}
+
+.firm-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.firm-table thead th {
+  position: sticky;
+  top: 0;
+  padding: 8px 14px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  text-align: left;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.firm-row {
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.firm-row:hover:not(.firm-row--disabled) {
+  background: var(--bg-elevated);
+}
+
+.firm-row--selected {
+  background: color-mix(in srgb, var(--row-color) 5%, transparent) !important;
+}
+
+.firm-row--disabled {
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
-.chip-rating {
+.firm-table td {
+  padding: 9px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.ft-name {
+  width: 40%;
+}
+
+.ft-action {
+  width: 48px;
+  text-align: right;
+}
+
+.row-sel-bar {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--row-color, transparent);
+  margin-right: 8px;
+  vertical-align: middle;
+  transition: background 0.15s;
+}
+
+.row-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.badge-instant {
+  margin-left: 6px;
+  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #22d3ee;
+  border: 1px solid #22d3ee44;
+  border-radius: 3px;
+  background: #22d3ee10;
+}
+
+.row-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rating-stars {
+  display: flex;
+  gap: 2px;
+}
+
+.star {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.star.full {
+  background: #f59e0b;
+}
+
+.star.half {
+  background: linear-gradient(90deg, #f59e0b 50%, var(--border) 50%);
+}
+
+.star.empty {
+  background: var(--border);
+}
+
+.rating-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.reviews-count {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-muted);
 }
 
-.firm-chip.selected .chip-rating {
-  color: var(--accent);
-  opacity: 0.7;
+.split-pct {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--green);
+  font-weight: 600;
 }
 
-.chip-action {
-  font-size: 11px;
-  opacity: 0.6;
+.fee-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
-/* Empty state */
-.empty-compare {
+.phases-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.cell-muted-text {
+  color: var(--text-muted);
+}
+
+.add-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  margin-left: auto;
+}
+
+.add-btn:hover { color: var(--accent); border-color: var(--accent); }
+.add-btn.added { color: var(--red); border-color: var(--red); background: rgba(239, 68, 68, 0.06); }
+
+/* ── Empty state ────────────────────────────────────────────── */
+.empty-state {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 64px 24px;
+  gap: 10px;
+  padding: 60px 24px;
   color: var(--text-muted);
-  font-size: 14px;
+  font-size: 13px;
 }
 
-.empty-icon {
-  font-size: 36px;
-  opacity: 0.3;
+.empty-arrows {
+  font-size: 28px;
+  opacity: 0.2;
+  letter-spacing: 8px;
 }
 
-/* Comparison grid */
-.comparison-wrap {
+/* ── Comparison grid ────────────────────────────────────────── */
+.comp-wrap {
   overflow-x: auto;
 }
 
 .comp-grid {
   display: grid;
-  grid-template-columns: 200px repeat(var(--cols), 1fr);
+  grid-template-columns: 180px repeat(var(--firm-count), 1fr);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
-  min-width: 500px;
+  min-width: 480px;
 }
 
-.comp-row {
+/* Header row */
+.comp-header {
   display: contents;
 }
 
-.comp-row > * {
-  padding: 10px 14px;
+.comp-header-spacer {
+  background: var(--bg-elevated);
+  border-bottom: 2px solid var(--border);
+}
+
+.comp-firm-cell {
+  padding: 16px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-elevated);
+  border-left: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  position: relative;
+  overflow: hidden;
+}
+
+.cfh-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--fc);
+}
+
+.cfh-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-top: 2px;
+}
+
+.cfh-link {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--fc);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+.cfh-link:hover { text-decoration: underline; }
+
+.cfh-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.cfh-rating, .cfh-split {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.cfh-remove {
+  margin-top: 6px;
+  align-self: flex-start;
+  padding: 3px 8px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.cfh-remove:hover { color: var(--red); border-color: var(--red); }
+
+/* Section header rows */
+.comp-section-row {
+  display: contents;
+}
+
+.comp-section-label {
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-elevated));
   border-bottom: 1px solid var(--border-subtle);
-  font-size: 13px;
   display: flex;
   align-items: center;
 }
 
-.comp-row-alt > * {
+.comp-section-fill {
+  background: color-mix(in srgb, var(--accent) 4%, var(--bg-elevated));
+  border-left: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Data rows */
+.comp-data-row {
+  display: contents;
+}
+
+.comp-data-row:nth-child(even) .comp-label-cell,
+.comp-data-row:nth-child(even) .comp-value-cell {
   background: var(--surface);
 }
 
-.comp-header-row > * {
-  background: var(--bg-elevated);
-  border-bottom: 1px solid var(--border);
-  padding: 16px 14px;
-}
-
-.comp-label-col {
+.comp-label-cell {
+  padding: 9px 14px;
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
   color: var(--text-muted);
-  background: var(--bg-elevated) !important;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
   border-right: 1px solid var(--border);
+  letter-spacing: 0.02em;
 }
 
-.comp-value-col {
-  font-family: var(--font-ui);
+.comp-value-cell {
+  padding: 9px 14px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text-secondary);
+  border-left: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
   justify-content: center;
   text-align: center;
-  border-right: 1px solid var(--border-subtle);
+  transition: background 0.15s;
 }
 
-.comp-value-col:last-child {
-  border-right: none;
-}
-
-.comp-firm-header {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  border-right: 1px solid var(--border);
-}
-
-.comp-firm-header:last-child {
-  border-right: none;
-}
-
-.firm-header-name {
-  font-size: 15px;
+/* Cell state classes */
+.cell-green {
+  color: var(--green);
   font-weight: 700;
-  color: var(--text-primary);
 }
 
-.firm-header-link {
-  font-size: 11px;
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.firm-header-link:hover {
-  text-decoration: underline;
-}
-
-.firm-remove-btn {
-  margin-top: 2px;
-  padding: 2px 6px;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-size: 10px;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-}
-
-.firm-remove-btn:hover {
+.cell-red {
   color: var(--red);
-  border-color: var(--red);
+  font-weight: 600;
 }
 
-.comp-notes {
-  font-size: 12px;
+.cell-amber {
+  color: #f59e0b;
+}
+
+.cell-muted {
   color: var(--text-muted);
-  text-align: left !important;
-  justify-content: flex-start !important;
+}
+
+.cell-best {
+  background: color-mix(in srgb, var(--green) 10%, transparent) !important;
+  color: var(--green) !important;
+  font-weight: 700;
+}
+
+/* Notes */
+.comp-notes-row .comp-value-cell {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  text-align: left;
+  justify-content: flex-start;
   line-height: 1.5;
+  color: var(--text-muted);
 }
 </style>

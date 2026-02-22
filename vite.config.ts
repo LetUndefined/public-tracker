@@ -4,7 +4,7 @@ import { resolve } from 'path'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/',
+  base: '/public-tracker/',
   plugins: [
     vue(),
     VitePWA({
@@ -20,17 +20,17 @@ export default defineConfig({
         background_color: '#06060b',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: '/',
-        scope: '/',
+        start_url: '/public-tracker/',
+        scope: '/public-tracker/',
         icons: [
           {
-            src: '/icon-192.png',
+            src: '/public-tracker/icon-192.png',
             sizes: '192x192',
             type: 'image/png',
             purpose: 'any maskable',
           },
           {
-            src: '/icon-512.png',
+            src: '/public-tracker/icon-512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'any maskable',

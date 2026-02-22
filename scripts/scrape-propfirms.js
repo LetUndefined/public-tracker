@@ -204,7 +204,8 @@ async function scrape() {
 
   for (let i = 0; i < allFirms.length; i++) {
     const firm = allFirms[i]
-    const { name, slug, id, reviewScore, programType, firmPlatforms, type: firmType,
+    const { name, slug, id, reviewScore, reviewCount, reviewsCount, totalReviews,
+      programType, firmPlatforms, type: firmType,
       assetFxEnabled, assetCryptoEnabled, assetIndicesEnabled, assetMetalsEnabled,
       assetOtherCommoditiesEnabled, assetFuturesEnabled, assetStocksEnabled } = firm
 
@@ -270,7 +271,8 @@ async function scrape() {
     const row = {
       name,
       website: `https://propfirmmatch.com/prop-firms/${slug}`,
-      rating:  reviewScore ?? null,
+      rating:        reviewScore ?? null,
+      reviews_count: reviewCount ?? reviewsCount ?? totalReviews ?? null,
       phases,
       program_types,
       // Use firm.type as the authoritative source for forex vs futures categorisation.
