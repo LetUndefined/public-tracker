@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useChallenges } from '@/composables/useChallenges'
 import { useAuth } from '@/composables/useAuth'
+import { usePageTour } from '@/composables/usePageTour'
 
 interface HistoryEntry {
   id: string
@@ -224,10 +225,22 @@ const stats = computed(() => {
   return { passed, failed, total, payout, passRate, passAvg, failAvg }
 })
 
+const { startPageTour } = usePageTour()
+
 onMounted(async () => {
   await fetchChallenges()
   await load()
   buildSuggestions()
+  startPageTour('history', [
+    {
+      title: 'Challenge Log',
+      body: 'Archive completed challenges here — mark them Passed, Failed, or Abandoned. This builds your personal prop firm track record.',
+    },
+    {
+      title: 'Pass/Fail Scoreboard',
+      body: 'The stats at the top show your overall pass rate and the average number of days it took to pass or fail each phase.',
+    },
+  ])
 })
 </script>
 

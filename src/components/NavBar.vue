@@ -18,12 +18,12 @@ const mobileOpen = ref(false)
 checkAdmin()
 
 const navItems = [
-  { path: '/', label: 'Challenges' },
-  { path: '/notifications', label: 'Notifications' },
-  { path: '/analytics', label: 'Analytics' },
-  { path: '/payouts', label: 'Payouts' },
-  { path: '/history', label: 'History' },
-  { path: '/compare', label: 'Compare Prop Firms' },
+  { path: '/', label: 'Challenges', tour: '' },
+  { path: '/notifications', label: 'Notifications', tour: 'nav-notifications' },
+  { path: '/analytics', label: 'Analytics', tour: 'nav-analytics' },
+  { path: '/payouts', label: 'Payouts', tour: 'nav-payouts' },
+  { path: '/history', label: 'History', tour: '' },
+  { path: '/compare', label: 'Compare Prop Firms', tour: 'nav-compare' },
 ]
 
 async function handleSignOut() {
@@ -53,6 +53,7 @@ async function handleSignOut() {
           :to="item.path"
           class="nav-link"
           :class="{ active: route.path === item.path }"
+          :data-tour="item.tour || undefined"
           @click="mobileOpen = false"
         >
           <span class="nav-label">{{ item.label }}</span>

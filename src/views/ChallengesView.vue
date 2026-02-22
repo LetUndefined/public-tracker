@@ -109,7 +109,7 @@ onUnmounted(() => {
                 <span class="hdr-status-text live">Feed active</span>
               </template>
             </div>
-            <div class="hdr-stat-label">AUTO REFRESH 30s</div>
+            <div class="hdr-stat-label">AUTO REFRESH 60s</div>
           </div>
 
           <div class="hdr-divider" />

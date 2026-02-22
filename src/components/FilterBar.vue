@@ -124,7 +124,7 @@ const activeFilterCount = computed(() => {
     </button>
 
     <!-- Add button -->
-    <button class="btn-add" @click="emit('addChallenge')">
+    <button class="btn-add" data-tour="add-challenge" @click="emit('addChallenge')">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <path d="M12 5v14M5 12h14"/>
       </svg>

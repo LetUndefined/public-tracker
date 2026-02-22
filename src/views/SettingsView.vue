@@ -3,11 +3,13 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
+import { useTour } from '@/composables/useTour'
 import { supabase } from '@/lib/supabase'
 
 const { user, signOut } = useAuth()
 const router = useRouter()
 const toast = useToast()
+const { startTour } = useTour()
 
 const apiKey = ref('')
 const hasKey = ref(false)
@@ -86,6 +88,20 @@ async function handleSignOut() {
         <div class="user-row">
           <div class="user-email">{{ user?.email }}</div>
           <button class="danger-btn" @click="handleSignOut">Sign Out</button>
+        </div>
+      </section>
+
+      <!-- Guide -->
+      <section class="settings-card">
+        <div class="card-label">APP GUIDE</div>
+        <p class="card-desc">Take an interactive tour of Challenge Tracker — highlights each feature with a short explanation.</p>
+        <div class="card-actions">
+          <button class="ghost-btn" @click="startTour">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="flex-shrink:0">
+              <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
+            </svg>
+            Start Guide
+          </button>
         </div>
       </section>
 
@@ -315,6 +331,9 @@ async function handleSignOut() {
 .save-btn:not(:disabled):hover { opacity: 0.88; }
 
 .ghost-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 10px 20px;
   background: none;
   border: 1px solid var(--border-subtle);

@@ -43,7 +43,7 @@ let fullInterval: ReturnType<typeof setInterval> | null = null
 
 export function useMetaCopier() {
   // Fast path: only accounts list + open positions (live PNL)
-  // Called every 30s — 1 + N proxy calls per cycle
+  // Called every 60s — 1 + N proxy calls per cycle
   async function fetchLive() {
     loading.value = true
     error.value = null

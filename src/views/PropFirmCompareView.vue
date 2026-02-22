@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
+import { usePageTour } from '@/composables/usePageTour'
 
 interface PropFirm {
   id: string
@@ -60,7 +61,21 @@ async function load() {
   loading.value = false
 }
 
-onMounted(load)
+const { startPageTour } = usePageTour()
+
+onMounted(() => {
+  load()
+  startPageTour('compare', [
+    {
+      title: 'Filter & Sort',
+      body: 'Use the filters above to narrow down firms by rating, drawdown type, profit split, steps, and trading rules.',
+    },
+    {
+      title: 'Reading the Table',
+      body: 'Click any column header to sort. Green ✓ means the rule favors you. Rating uses Trustpilot scores — scroll right to see all columns.',
+    },
+  ])
+})
 
 // Weighted score: rating × log(reviews + 1) so high-rated-but-few-reviews
 // firms don't outrank well-reviewed firms with a slightly lower rating

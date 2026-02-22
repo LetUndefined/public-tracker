@@ -98,7 +98,7 @@ function sign(v: number): string { return v >= 0 ? '+' : '' }
 </script>
 
 <template>
-  <div class="module">
+  <div class="module" data-tour="stats-bar">
     <div class="scan-line" />
 
     <!-- ── THREE HERO PANELS ────────────────────────── -->
@@ -149,7 +149,7 @@ function sign(v: number): string { return v >= 0 ? '+' : '' }
           {{ sign(animOpenPnl) }}{{ fmt(animOpenPnl, true) }}
         </div>
         <div class="panel-sub">
-          <span class="sub-dim">unrealized — auto refresh 30s</span>
+          <span class="sub-dim">unrealized — auto refresh 60s</span>
         </div>
       </div>
 

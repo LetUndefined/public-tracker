@@ -4,22 +4,28 @@ import { useRouter, useRoute } from 'vue-router'
 import NavBar from './components/NavBar.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import ApiKeyBanner from './components/ApiKeyBanner.vue'
+import TourOverlay from './components/TourOverlay.vue'
+import PageTip from './components/PageTip.vue'
 import { useMetaCopier } from '@/composables/useMetaCopier'
 import { useChallenges } from '@/composables/useChallenges'
 import { useNotifications } from '@/composables/useNotifications'
 import { useAuth } from '@/composables/useAuth'
+import { useTour } from '@/composables/useTour'
 import { supabase } from '@/lib/supabase'
 
 const { startAutoRefresh } = useMetaCopier()
 const { fetchChallenges, challengeRows } = useChallenges()
 const { startPolling } = useNotifications()
 const { isAuthenticated } = useAuth()
+const { startTour, hasSeenTour } = useTour()
 const router = useRouter()
 const route = useRoute()
 
 const appReady = ref(false)
+let bootstrapped = false
 
 async function bootstrap() {
+  bootstrapped = true
   startAutoRefresh(30_000)
   await fetchChallenges()
 
@@ -38,6 +44,11 @@ async function bootstrap() {
   }
 
   appReady.value = true
+
+  // Auto-launch tour for first-time users
+  if (!hasSeenTour()) {
+    setTimeout(startTour, 600)
+  }
 }
 
 onMounted(async () => {
@@ -58,9 +69,10 @@ onMounted(async () => {
   await bootstrap()
 })
 
-// Re-bootstrap when user logs in
+// Bootstrap after sign-in (appReady was already true for the login page,
+// so we track bootstrapped separately)
 watch(isAuthenticated, async (authed) => {
-  if (authed && !appReady.value) {
+  if (authed && !bootstrapped) {
     await bootstrap()
   }
 })
@@ -95,6 +107,8 @@ watch(isAuthenticated, async (authed) => {
     </template>
   </div>
   <ToastContainer />
+  <TourOverlay />
+  <PageTip />
 </template>
 
 <style scoped>

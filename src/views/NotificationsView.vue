@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useNotifications } from '@/composables/useNotifications'
 import { usePushNotifications } from '@/composables/usePushNotifications'
+import { usePageTour } from '@/composables/usePageTour'
 import type { TradeNotification } from '@/composables/useNotifications'
 
 const { notifications, loading, includeMaster } = useNotifications()
@@ -116,6 +117,24 @@ function formatPnl(v: number): string {
   const abs = Math.abs(v).toFixed(2)
   return v >= 0 ? `+$${abs}` : `-$${abs}`
 }
+
+const { startPageTour } = usePageTour()
+onMounted(() => {
+  startPageTour('notifications', [
+    {
+      title: 'Trade Alerts',
+      body: 'Every trade that opens or closes on your accounts appears here in real time. The feed updates automatically.',
+    },
+    {
+      title: 'Per-Account Feed',
+      body: 'Click an account on the left to filter the feed to that challenge only. Closed trade P&L is colour-coded green/red.',
+    },
+    {
+      title: 'Push Notifications',
+      body: 'Enable browser push alerts to get notified on your device — even when the tab is in the background.',
+    },
+  ])
+})
 
 function isBuy(side: string): boolean {
   const s = side.toLowerCase()

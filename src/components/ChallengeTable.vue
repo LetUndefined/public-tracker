@@ -111,7 +111,7 @@ function formatLastTrade(ts: string | null): string {
 
 <template>
   <!-- Desktop: scrollable table -->
-  <div class="table-wrapper desktop-table">
+  <div class="table-wrapper desktop-table" data-tour="challenge-table">
     <table class="challenge-table">
       <thead>
         <tr>

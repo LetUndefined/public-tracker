@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePayouts } from '@/composables/usePayouts'
 import { useChallenges } from '@/composables/useChallenges'
+import { usePageTour } from '@/composables/usePageTour'
 import type { Payout } from '@/types'
 
 const { payouts, loading, totalReceived, totalPending, fetchPayouts, addPayout, updatePayout, deletePayout } = usePayouts()
@@ -113,9 +114,21 @@ function resetForm() {
   formError.value = ''
 }
 
+const { startPageTour } = usePageTour()
+
 onMounted(() => {
   fetchPayouts()
   fetchChallenges()
+  startPageTour('payouts', [
+    {
+      title: 'Log Your Payouts',
+      body: 'Record every payout you receive from your prop firms. Link each one to a challenge, add the amount and date.',
+    },
+    {
+      title: 'Total Capital Extracted',
+      body: 'The ledger tracks your running total across all firms. Use it to measure your real return on funded accounts.',
+    },
+  ])
 })
 </script>
 

@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useChallenges } from '@/composables/useChallenges'
 import { useMetaCopier } from '@/composables/useMetaCopier'
 import { useMasterToggle } from '@/composables/useMasterToggle'
+import { usePageTour } from '@/composables/usePageTour'
 import type { MetaCopierTrade } from '@/types'
 
 const { challengeRows } = useChallenges()
@@ -253,7 +254,20 @@ watch(includeMaster, () => {
   if (challengeRows.value.length > 0) loadAnalytics()
 })
 
+const { startPageTour } = usePageTour()
+
 onMounted(() => {
+  startPageTour('analytics', [
+    {
+      title: 'Equity Curve',
+      body: 'The chart tracks your account equity over time. Use the account selector to switch between individual challenges or view all at once.',
+    },
+    {
+      title: 'Performance Stats',
+      body: 'Win rate, profit factor, average win/loss, and daily P&L breakdown — scroll down to see the full breakdown for your selected account.',
+    },
+  ])
+
   window.addEventListener('keydown', handleKeydown)
 
   // If data is already loaded (navigated from another page), run immediately.
