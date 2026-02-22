@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
     const { data: allowed, error: rlErr } = await supabase.rpc('check_rate_limit', {
       p_user_id: userId,
       p_endpoint: 'proxy-metacopier',
-      p_max_calls: 300,  // per 60s: (1 + 2N) live + N/3 history; 300 covers ~40 accounts with burst headroom
+      p_max_calls: 100,  // per 60s: (1 + 2N) live + N/3 history; 100 covers ~15 accounts with burst headroom
       p_window_seconds: 60,
     })
     if (rlErr) return err(req, 'Service unavailable', 500, `Rate limit RPC: ${rlErr.message}`)
