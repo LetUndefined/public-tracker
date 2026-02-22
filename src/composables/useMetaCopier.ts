@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 import type { MetaCopierAccount, MetaCopierTrade } from '@/types'
-import { getAccounts, getAccountTrades, getOpenPositions } from '@/lib/metacopier'
+import { getBatchLive, getBatchHistory, getAccountTrades } from '@/lib/metacopier'
 import type { OpenPositionInfo } from '@/lib/metacopier'
 
 const accounts = ref<MetaCopierAccount[]>([])
@@ -42,20 +42,15 @@ let liveInterval: ReturnType<typeof setInterval> | null = null
 let fullInterval: ReturnType<typeof setInterval> | null = null
 
 export function useMetaCopier() {
-  // Fast path: only accounts list + open positions (live PNL)
-  // Called every 60s — 1 + N proxy calls per cycle
+  // Fast path: all accounts + info + open positions in 1 batch edge call
+  // Called every 60s — was 1 + 2N calls, now just 1
   async function fetchLive() {
     loading.value = true
     error.value = null
     try {
-      accounts.value = await getAccounts()
-      const posEntries = await Promise.all(
-        accounts.value.map(async (acc) => {
-          const info = await getOpenPositions(acc.id)
-          return [acc.id, info] as const
-        })
-      )
-      openPositionsMap.value = Object.fromEntries(posEntries)
+      const { accounts: accs, openPositionsMap: posMap } = await getBatchLive()
+      accounts.value = accs
+      openPositionsMap.value = posMap
     } catch (e: any) {
       error.value = e.message
       console.error('Failed to fetch MetaCopier accounts:', e)
@@ -64,29 +59,23 @@ export function useMetaCopier() {
     }
   }
 
-  // Slow path: trade history for streak, daily PNL, last trade, notifications cache
-  // Called every 90s — N proxy calls per cycle, results shared via tradesMap
+  // Slow path: trade history for all accounts in 1 batch edge call
+  // Called every 180s — was N calls, now just 1
   async function fetchHistory() {
     try {
-      const tradeResults = await Promise.all(
-        accounts.value.map(async (acc) => {
-          try {
-            const trades = await getAccountTrades(acc.id)
-            let lastTime = ''
-            if (trades.length > 0) {
-              const sorted = trades.sort((a, b) => {
-                const ta = a.close_time ?? a.open_time
-                const tb = b.close_time ?? b.open_time
-                return tb.localeCompare(ta)
-              })
-              lastTime = sorted[0].close_time ?? sorted[0].open_time
-            }
-            return { id: acc.id, trades, lastTime, count: trades.length, streak: computeStreak(trades), dailyPnl: computeDailyPnl(trades) }
-          } catch {
-            return { id: acc.id, trades: [] as MetaCopierTrade[], lastTime: '', count: 0, streak: null, dailyPnl: 0 }
-          }
-        })
-      )
+      const allTrades = await getBatchHistory()
+      const tradeResults = Object.entries(allTrades).map(([id, trades]) => {
+        let lastTime = ''
+        if (trades.length > 0) {
+          const sorted = [...trades].sort((a, b) => {
+            const ta = a.close_time ?? a.open_time
+            const tb = b.close_time ?? b.open_time
+            return tb.localeCompare(ta)
+          })
+          lastTime = sorted[0].close_time ?? sorted[0].open_time
+        }
+        return { id, trades, lastTime, count: trades.length, streak: computeStreak(trades), dailyPnl: computeDailyPnl(trades) }
+      })
       tradesMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.trades]))
       lastTradeMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.lastTime]))
       tradeCountMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.count]))
