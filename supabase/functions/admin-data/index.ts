@@ -1,26 +1,21 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-function err(msg: string, status: number) {
+function err(req: Request, msg: string, status: number, internal?: string) {
+  if (internal) console.error(`[admin-data] ${status}: ${internal}`)
   return new Response(JSON.stringify({ error: msg }), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   })
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: CORS })
-  if (req.method !== 'POST') return err('Method not allowed', 405)
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders(req) })
+  if (req.method !== 'POST') return err(req, 'Method not allowed', 405)
 
   try {
-    // 1. Verify JWT
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) return err('Unauthorized', 401)
+    if (!authHeader?.startsWith('Bearer ')) return err(req, 'Unauthorized', 401)
     const jwt = authHeader.slice(7)
 
     const supabase = createClient(
@@ -29,45 +24,42 @@ Deno.serve(async (req) => {
     )
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser(jwt)
-    if (authErr || !user) return err(`Unauthorized: ${authErr?.message ?? 'no user'}`, 401)
+    if (authErr || !user) return err(req, 'Unauthorized', 401, authErr?.message)
 
-    // 2. Verify admin status
     const { data: isAdmin, error: adminErr } = await supabase.rpc('is_admin', { p_user_id: user.id })
-    if (adminErr) return err(`Admin check failed: ${adminErr.message}`, 500)
-    if (!isAdmin) return err('Forbidden', 403)
+    if (adminErr) return err(req, 'Forbidden', 403, `Admin check: ${adminErr.message}`)
+    if (!isAdmin) return err(req, 'Forbidden', 403)
 
-    // 3. Fetch all users via admin auth API
-    const { data: { users }, error: usersErr } = await supabase.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000,
-    })
-    if (usersErr) return err(`Failed to fetch users: ${usersErr.message}`, 500)
+    // Paginate through ALL users — listUsers caps at 1000 per page
+    const allUsers: any[] = []
+    let page = 1
+    while (true) {
+      const { data: { users }, error: usersErr } = await supabase.auth.admin.listUsers({
+        page,
+        perPage: 1000,
+      })
+      if (usersErr) return err(req, 'Failed to fetch users', 500, usersErr.message)
+      allUsers.push(...users)
+      if (users.length < 1000) break
+      page++
+    }
 
-    // 4. Fetch all challenges (only columns guaranteed to exist)
     const { data: challenges, error: chErr } = await supabase
       .from('challenges')
       .select('id, user_id, alias, starting_balance, target_pct, created_at')
       .order('created_at', { ascending: false })
-    if (chErr) return err(`Failed to fetch challenges: ${chErr.message}`, 500)
+    if (chErr) return err(req, 'Failed to fetch challenges', 500, chErr.message)
 
-    // 5. Check which users have an API key via vault lookup
+    // Use RPC to check which users have API keys — never read vault.secrets directly
     let keyUserIds = new Set<string>()
     try {
-      const { data: vaultSecrets } = await supabase
-        .from('vault.secrets')
-        .select('name')
-      keyUserIds = new Set(
-        (vaultSecrets ?? [])
-          .map((s: any) => s.name)
-          .filter((n: string) => n.startsWith('metacopier_key_'))
-          .map((n: string) => n.replace('metacopier_key_', ''))
-      )
+      const { data: keyRows } = await supabase.rpc('list_users_with_metacopier_key')
+      keyUserIds = new Set((keyRows ?? []) as string[])
     } catch {
-      // vault.secrets may not be accessible — has_api_key will show false
+      // Non-critical — has_api_key will show false if RPC not set up
     }
 
-    // 6. Build response — never include API keys or password hashes
-    const userData = users.map((u) => ({
+    const userData = allUsers.map((u) => ({
       id: u.id,
       email: u.email,
       created_at: u.created_at,
@@ -78,10 +70,10 @@ Deno.serve(async (req) => {
     }))
 
     return new Response(JSON.stringify({ users: userData }), {
-      headers: { ...CORS, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
     })
 
   } catch (e: any) {
-    return err(`Unexpected error: ${e?.message ?? String(e)}`, 500)
+    return err(req, 'Internal server error', 500, e?.message ?? String(e))
   }
 })

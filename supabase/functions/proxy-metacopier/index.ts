@@ -1,8 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
 const METACOPIER_BASE = 'https://api.metacopier.io/rest/api/v1'
 
-// Only these paths may be proxied -- no wildcard, no arbitrary URLs
 const ALLOWED_PATH_PATTERNS = [
   /^\/accounts$/,
   /^\/accounts\/[a-zA-Z0-9_-]+\/information$/,
@@ -10,31 +10,25 @@ const ALLOWED_PATH_PATTERNS = [
   /^\/accounts\/[a-zA-Z0-9_-]+\/history\/positions$/,
 ]
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-client-info',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+function corsOk(req: Request) {
+  return new Response(null, { headers: corsHeaders(req) })
 }
 
-function corsOk() {
-  return new Response(null, { headers: CORS })
-}
-
-function err(msg: string, status: number) {
+function err(req: Request, msg: string, status: number, internal?: string) {
+  if (internal) console.error(`[proxy-metacopier] ${status}: ${internal}`)
   return new Response(JSON.stringify({ error: msg }), {
     status,
-    headers: { ...CORS, 'Content-Type': 'application/json' },
+    headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
   })
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return corsOk()
-  if (req.method !== 'POST') return err('Method not allowed', 405)
+  if (req.method === 'OPTIONS') return corsOk(req)
+  if (req.method !== 'POST') return err(req, 'Method not allowed', 405)
 
   try {
-    // 1. Verify JWT
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader?.startsWith('Bearer ')) return err('Unauthorized: missing bearer token', 401)
+    if (!authHeader?.startsWith('Bearer ')) return err(req, 'Unauthorized', 401)
     const jwt = authHeader.slice(7)
 
     const supabase = createClient(
@@ -43,43 +37,38 @@ Deno.serve(async (req) => {
     )
 
     const { data: { user }, error: authErr } = await supabase.auth.getUser(jwt)
-    if (authErr || !user) return err(`Unauthorized: ${authErr?.message ?? 'no user'}`, 401)
+    if (authErr || !user) return err(req, 'Unauthorized', 401, authErr?.message)
 
-    // 2. Rate limit
     const { data: allowed, error: rlErr } = await supabase.rpc('check_rate_limit', {
       p_user_id: user.id,
       p_endpoint: 'proxy-metacopier',
       p_max_calls: 600,
       p_window_seconds: 60,
     })
-    if (rlErr) return err(`Rate limit RPC error: ${rlErr.message}`, 500)
-    if (!allowed) return err('Rate limit exceeded', 429)
+    if (rlErr) return err(req, 'Service unavailable', 500, `Rate limit RPC: ${rlErr.message}`)
+    if (!allowed) return err(req, 'Rate limit exceeded', 429)
 
-    // 3. Parse and validate request body
     let body: { path: string; params?: Record<string, string> }
     try {
       body = await req.json()
     } catch {
-      return err('Invalid JSON body', 400)
+      return err(req, 'Invalid request', 400)
     }
 
     const { path, params } = body
-    if (!path || typeof path !== 'string') return err('Missing path', 400)
+    if (!path || typeof path !== 'string') return err(req, 'Invalid request', 400)
 
-    // Strip any query strings from path before allowlist check
     const cleanPath = path.split('?')[0]
     if (!ALLOWED_PATH_PATTERNS.some((r) => r.test(cleanPath))) {
-      return err(`Forbidden path: ${cleanPath}`, 403)
+      return err(req, 'Forbidden', 403, `Blocked path: ${cleanPath}`)
     }
 
-    // 4. Get API key from Vault
     const { data: apiKey, error: vaultErr } = await supabase.rpc('get_metacopier_key', {
       p_user_id: user.id,
     })
-    if (vaultErr) return err(`Vault RPC error: ${vaultErr.message}`, 500)
-    if (!apiKey) return err('No MetaCopier API key configured for this user', 403)
+    if (vaultErr) return err(req, 'Service unavailable', 500, `Vault RPC: ${vaultErr.message}`)
+    if (!apiKey) return err(req, 'API key not configured', 403)
 
-    // 5. Proxy to MetaCopier
     const url = new URL(METACOPIER_BASE + cleanPath)
     if (params && typeof params === 'object') {
       Object.entries(params).forEach(([k, v]) => {
@@ -95,17 +84,17 @@ Deno.serve(async (req) => {
         headers: { 'X-API-KEY': apiKey },
       })
     } catch (fetchErr: any) {
-      return err(`MetaCopier unreachable: ${fetchErr.message}`, 502)
+      return err(req, 'Upstream service unavailable', 502, fetchErr.message)
     }
 
     const data = await upstream.json()
 
     return new Response(JSON.stringify(data), {
       status: upstream.status,
-      headers: { ...CORS, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
     })
 
   } catch (e: any) {
-    return err(`Unexpected error: ${e?.message ?? String(e)}`, 500)
+    return err(req, 'Internal server error', 500, e?.message ?? String(e))
   }
 })
