@@ -338,7 +338,6 @@ function fmt(n: number, sign = false) {
 </template>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap');
 
 /* ── Root ── */
 .landing {
@@ -485,11 +484,11 @@ function fmt(n: number, sign = false) {
 }
 
 .hero-headline {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(48px, 6vw, 76px);
-  font-weight: 800;
-  line-height: 1.0;
-  letter-spacing: -0.02em;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(36px, 4.8vw, 64px);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.03em;
   color: #f0f2fa;
   margin: 0 0 24px;
   animation: fadeUp 0.6s 0.1s ease both;
@@ -554,11 +553,12 @@ function fmt(n: number, sign = false) {
 }
 
 .hs-num {
-  font-family: 'Syne', sans-serif;
-  font-size: 26px;
-  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 24px;
+  font-weight: 700;
   color: #F0B429;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .hs-label {
@@ -868,7 +868,7 @@ function fmt(n: number, sign = false) {
 }
 
 .feature-title {
-  font-family: 'Syne', sans-serif;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 18px;
   font-weight: 700;
   color: #e2e4ee;
@@ -912,11 +912,12 @@ function fmt(n: number, sign = false) {
 }
 
 .cta-headline {
-  font-family: 'Syne', sans-serif;
-  font-size: clamp(36px, 5vw, 52px);
-  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(28px, 4vw, 46px);
+  font-weight: 700;
   color: #f0f2fa;
   line-height: 1.1;
+  letter-spacing: -0.03em;
   margin: 8px 0;
 }
 
