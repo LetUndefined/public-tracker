@@ -114,12 +114,12 @@ export function useMetaCopier() {
     }
   }
 
-  function startAutoRefresh(liveMs = 30_000, historyMs = 90_000) {
+  function startAutoRefresh(liveMs = 60_000, historyMs = 180_000) {
     stopAutoRefresh()
     fetchAccounts()
-    // Live positions refresh every 30s
+    // Live positions refresh every 60s
     liveInterval = setInterval(fetchLive, liveMs)
-    // Trade history refresh every 90s (also updates notification cache)
+    // Trade history refresh every 3 min (also updates notification cache)
     fullInterval = setInterval(fetchHistory, historyMs)
   }
 
