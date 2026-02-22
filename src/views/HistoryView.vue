@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useChallenges } from '@/composables/useChallenges'
+import { useAuth } from '@/composables/useAuth'
 
 interface HistoryEntry {
   id: string
@@ -21,6 +22,7 @@ interface HistoryEntry {
 }
 
 const { challengeRows, fetchChallenges } = useChallenges()
+const { user } = useAuth()
 
 const entries = ref<HistoryEntry[]>([])
 const loading = ref(false)
@@ -128,6 +130,7 @@ function onChallengeSelect() {
 
 async function save() {
   const payload = {
+    user_id: user.value?.id,
     challenge_id: form.value.challenge_id || null,
     alias: form.value.alias,
     prop_firm: form.value.prop_firm,
