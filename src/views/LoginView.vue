@@ -24,7 +24,10 @@ async function submit() {
     if (!email.value) { error.value = 'Email required'; return }
     loading.value = true
     try {
-      const redirectTo = window.location.origin + import.meta.env.BASE_URL + 'reset-password'
+      const base = import.meta.env.PROD
+        ? 'https://letundefined.github.io/public-tracker/'
+        : window.location.origin + import.meta.env.BASE_URL
+      const redirectTo = base + 'reset-password'
       const { error: e } = await supabase.auth.resetPasswordForEmail(email.value, { redirectTo })
       if (e) throw e
       info.value = 'Check your email for a password reset link.'

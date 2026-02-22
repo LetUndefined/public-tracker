@@ -30,6 +30,15 @@ Deno.serve(async (req) => {
     if (adminErr) return err(req, 'Forbidden', 403, `Admin check: ${adminErr.message}`)
     if (!isAdmin) return err(req, 'Forbidden', 403)
 
+    const { data: allowed, error: rlErr } = await supabase.rpc('check_rate_limit', {
+      p_user_id: user.id,
+      p_endpoint: 'admin-data',
+      p_max_calls: 10,
+      p_window_seconds: 60,
+    })
+    if (rlErr) return err(req, 'Service unavailable', 500, `Rate limit RPC: ${rlErr.message}`)
+    if (!allowed) return err(req, 'Rate limit exceeded', 429)
+
     // Paginate through ALL users — listUsers caps at 1000 per page
     const allUsers: any[] = []
     let page = 1

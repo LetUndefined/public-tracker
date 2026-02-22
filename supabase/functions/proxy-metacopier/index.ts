@@ -70,12 +70,14 @@ Deno.serve(async (req) => {
     if (!apiKey) return err(req, 'API key not configured', 403)
 
     const url = new URL(METACOPIER_BASE + cleanPath)
-    if (params && typeof params === 'object') {
-      Object.entries(params).forEach(([k, v]) => {
-        if (typeof k === 'string' && typeof v === 'string') {
-          url.searchParams.set(k, v)
-        }
-      })
+    if (params && typeof params === 'object' && !Array.isArray(params)) {
+      const entries = Object.entries(params)
+      if (entries.length > 10) return err(req, 'Invalid request', 400, 'Too many params')
+      for (const [k, v] of entries) {
+        if (typeof k !== 'string' || typeof v !== 'string') continue
+        if (k.length > 50 || v.length > 200) return err(req, 'Invalid request', 400, 'Param too large')
+        url.searchParams.set(k, v)
+      }
     }
 
     let upstream: Response
