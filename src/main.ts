@@ -37,16 +37,14 @@ const router = createRouter({
 // Auth guard
 router.beforeEach(async (to) => {
   if (to.meta.public) {
-    const { data } = await supabase.auth.getSession()
-    if (data.session) {
-      const { startPage } = useStartPage()
-      const pref = startPage.value
-
-      // Redirect authenticated users away from /login to their start page
-      if (to.path === '/login') return pref === '/' ? '/dashboard' : pref
-
-      // On landing page, redirect to their chosen start page (if not landing)
-      if (to.path === '/' && pref !== '/') return pref
+    // Redirect authenticated users away from /login to their start page
+    if (to.path === '/login') {
+      const { data } = await supabase.auth.getSession()
+      if (data.session) {
+        const { startPage } = useStartPage()
+        const pref = startPage.value
+        return pref === '/' ? '/dashboard' : pref
+      }
     }
     return true
   }

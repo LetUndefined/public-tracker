@@ -11,6 +11,7 @@ import { useChallenges } from '@/composables/useChallenges'
 import { useNotifications } from '@/composables/useNotifications'
 import { useAuth } from '@/composables/useAuth'
 import { useTour } from '@/composables/useTour'
+import { useStartPage } from '@/composables/useStartPage'
 import { supabase } from '@/lib/supabase'
 
 const { startAutoRefresh } = useMetaCopier()
@@ -18,6 +19,7 @@ const { fetchChallenges, challengeRows } = useChallenges()
 const { startPolling } = useNotifications()
 const { isAuthenticated } = useAuth()
 const { startTour, hasSeenTour } = useTour()
+const { startPage } = useStartPage()
 const router = useRouter()
 const route = useRoute()
 
@@ -56,6 +58,11 @@ onMounted(async () => {
   if (!data.session) {
     appReady.value = true // show login page immediately
     return
+  }
+
+  // On initial load at /, redirect to the user's chosen start page
+  if (route.path === '/' && startPage.value !== '/') {
+    router.replace(startPage.value)
   }
 
   // Check if user has configured their API key
