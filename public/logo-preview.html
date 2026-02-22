@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sentinel — Logo Preview</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0a0b0f;
+    --surface: #111318;
+    --border:  #1e2028;
+    --accent:  #F0B429;
+    --text:    #e8eaf0;
+    --muted:   #4a4f5e;
+  }
+
+  body {
+    background: var(--bg);
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 64px;
+    padding: 60px 32px;
+  }
+
+  /* ─── Section label ─── */
+  .label {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  /* ─── Navbar mock ─── */
+  .navbar {
+    width: 100%;
+    max-width: 860px;
+    height: 52px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 10px;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-text {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: #6b7280;
+  }
+
+  .brand-accent { color: var(--accent); }
+
+  .nav-pills {
+    display: flex;
+    gap: 2px;
+    margin-left: 24px;
+  }
+
+  .nav-pill {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #4a4f5e;
+    border-radius: 5px;
+    letter-spacing: 0.03em;
+  }
+
+  .nav-pill.active { color: var(--text); background: rgba(240,180,41,0.06); }
+
+  /* ─── Mark sizes ─── */
+  .sizes {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+  }
+
+  .size-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .size-label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+  }
+
+  /* ─── Wordmark ─── */
+  .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .wordmark-text {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+  }
+
+  .wordmark-text .s1 { color: #6b7280; }
+  .wordmark-text .s2 { color: var(--accent); }
+
+  .wordmark-sub {
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--muted);
+    margin-top: -2px;
+  }
+
+  /* ─── On light ─── */
+  .light-bg {
+    background: #f5f5f0;
+    border-radius: 10px;
+    padding: 32px 48px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .light-text { font-size: 22px; font-weight: 800; letter-spacing: 0.16em; color: #1a1a1a; }
+  .light-accent { color: #d4920a; }
+
+  /* ─── Favicon mock ─── */
+  .favicon-wrap {
+    width: 32px;
+    height: 32px;
+    background: var(--bg);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+  <!-- NAVBAR MOCK -->
+  <div style="width:100%;max-width:860px">
+    <div class="label">NAVBAR</div>
+    <div class="navbar">
+      <div class="brand">
+        <!-- Mark 20px -->
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 1L23 12L12 23L1 12Z" stroke="#F0B429" stroke-width="1.5"/>
+          <path d="M12 6L18 12L12 18L6 12Z" fill="#F0B429" fill-opacity="0.15" stroke="#F0B429" stroke-width="1" stroke-opacity="0.4"/>
+          <line x1="3" y1="12" x2="21" y2="12" stroke="#F0B429" stroke-width="0.8" stroke-opacity="0.3"/>
+          <path d="M12 10L14 12L12 14L10 12Z" fill="#F0B429"/>
+        </svg>
+        <span class="brand-text">SENTI<span class="brand-accent">NEL</span></span>
+      </div>
+      <div class="nav-pills">
+        <div class="nav-pill active">Challenges</div>
+        <div class="nav-pill">Notifications</div>
+        <div class="nav-pill">Analytics</div>
+        <div class="nav-pill">Payouts</div>
+        <div class="nav-pill">History</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MARK SIZES -->
+  <div style="width:100%;max-width:860px">
+    <div class="label">MARK — SIZES</div>
+    <div class="sizes">
+      <div class="size-item">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+          <path d="M12 1L23 12L12 23L1 12Z" stroke="#F0B429" stroke-width="1.5"/>
+          <path d="M12 6L18 12L12 18L6 12Z" fill="#F0B429" fill-opacity="0.15" stroke="#F0B429" stroke-width="1" stroke-opacity="0.4"/>
+          <line x1="3" y1="12" x2="21" y2="12" stroke="#F0B429" stroke-width="0.8" stroke-opacity="0.3"/>
+          <path d="M12 10L14 12L12 14L10 12Z" fill="#F0B429"/>
+        </svg>
+        <span class="size-label">64px</span>
+      </div>
+      <div class="size-item">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+          <path d="M12 1L23 12L12 23L1 12Z" stroke="#F0B429" stroke-width="1.5"/>
+          <path d="M12 6L18 12L12 18L6 12Z" fill="#F0B429" fill-opacity="0.15" stroke="#F0B429" stroke-width="1" stroke-opacity="0.4"/>
+          <line x1="3" y1="12" x2="21" y2="12" stroke="#F0B429" stroke-width="0.8" stroke-opacity="0.3"/>
+          <path d="M12 10L14 12L12 14L10 12Z" fill="#F0B429"/>
+        </svg>
+        <span class="size-label">48px</span>
+      </div>
+      <div class="size-item">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <path d="M12 1L23 12L12 23L1 12Z" stroke="#F0B429" stroke-width="1.5"/>
+          <path d="M12 6L18 12L12 18L6 12Z" fill="#F0B429" fill-opacity="0.15" stroke="#F0B429" stroke-width="1" stroke-opacity="0.4"/>
+          <line x1="3" y1="12" x2="21" y2="12" stroke="#F0B429" stroke-width="0.8" stroke-opacity="0.3"/>
+          <path d="M12 10L14 12L12 14L10 12Z" fill="#F0B429"/>
+        </svg>
+        <span class="size-label">32px</span>
+      </div>
+      <div class="size-item">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M12 1L23 12L12 23L1 12Z" stroke="#F0B429" stroke-width="1.5"/>
+          <path d="M12 6L18 12L12 18L6 12Z" fill="#F0B429" fill-opacity="0.15" stroke="#F0B429" stroke-width="1" stroke-opacity="0.4"/>
+          <line x1="3" y1="12" x2="21" y2="12" stroke="#F0B429" stroke-width="0.8" stroke-opacity="0.3"/>
+          <path d="M12 10L14 12L12 14L10 12Z" fill="#F0B429"/>
+        </svg>
+        <span class="size-label">20px</span>
+      </div>
+      <div class="size-item">
+        <div class="favicon-wrap">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M12 1L23 12L12 23L1 12Z" stroke="#F0B429" stroke-width="1.5"/>
+            <path d="M12 10L14 12L12 14L10 12Z" fill="#F0B429"/>
+          </svg>
+        </div>
+        <span class="size-label">favicon</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORDMARK -->
+  <div style="width:100%;max-width:860px">
+    <div class="label">WORDMARK — DARK</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:40px 48px;display:flex;align-items:center;gap:20px;">
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="none">
+        <path d="M12 1L23 12L12 23L1 12Z" stroke="#F0B429" stroke-width="1.5"/>
+        <path d="M12 6L18 12L12 18L6 12Z" fill="#F0B429" fill-opacity="0.15" stroke="#F0B429" stroke-width="1" stroke-opacity="0.4"/>
+        <line x1="3" y1="12" x2="21" y2="12" stroke="#F0B429" stroke-width="0.8" stroke-opacity="0.3"/>
+        <path d="M12 10L14 12L12 14L10 12Z" fill="#F0B429"/>
+      </svg>
+      <div>
+        <div class="wordmark-text"><span class="s1">SENTI</span><span class="s2">NEL</span></div>
+        <div class="wordmark-sub">PROP FIRM TRACKER</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORDMARK LIGHT -->
+  <div style="width:100%;max-width:860px">
+    <div class="label">WORDMARK — LIGHT</div>
+    <div class="light-bg">
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none">
+        <path d="M12 1L23 12L12 23L1 12Z" stroke="#d4920a" stroke-width="1.5"/>
+        <path d="M12 6L18 12L12 18L6 12Z" fill="#d4920a" fill-opacity="0.12" stroke="#d4920a" stroke-width="1" stroke-opacity="0.4"/>
+        <line x1="3" y1="12" x2="21" y2="12" stroke="#d4920a" stroke-width="0.8" stroke-opacity="0.3"/>
+        <path d="M12 10L14 12L12 14L10 12Z" fill="#d4920a"/>
+      </svg>
+      <span class="light-text">SENTI<span class="light-accent">NEL</span></span>
+    </div>
+  </div>
+
+</body>
+</html>

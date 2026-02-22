@@ -38,12 +38,14 @@ async function handleSignOut() {
     <div class="navbar-inner">
       <div class="navbar-brand">
         <div class="brand-mark">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M10 2L18 7V13L10 18L2 13V7L10 2Z" stroke="currentColor" stroke-width="1.5" fill="none"/>
-            <path d="M10 7L14 9.5V14.5L10 17L6 14.5V9.5L10 7Z" fill="currentColor" opacity="0.4"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 1L23 12L12 23L1 12Z" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M12 6L18 12L12 18L6 12Z" fill="currentColor" fill-opacity="0.15" stroke="currentColor" stroke-width="1" stroke-opacity="0.4"/>
+            <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="0.8" stroke-opacity="0.3"/>
+            <path d="M12 10L14 12L12 14L10 12Z" fill="currentColor"/>
           </svg>
         </div>
-        <span class="brand-text">CHALLENGE<span class="brand-accent">TRACKER</span></span>
+        <span class="brand-text">SENTI<span class="brand-accent">NEL</span></span>
       </div>
 
       <div class="navbar-links" :class="{ open: mobileOpen }">

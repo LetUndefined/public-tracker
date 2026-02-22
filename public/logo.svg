@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Outer diamond -->
+  <path d="M100 8L192 100L100 192L8 100Z" stroke="#F0B429" stroke-width="6" fill="none"/>
+  <!-- Mid diamond -->
+  <path d="M100 38L162 100L100 162L38 100Z" fill="#F0B429" fill-opacity="0.08" stroke="#F0B429" stroke-width="2" stroke-opacity="0.3"/>
+  <!-- Horizontal scan line -->
+  <line x1="18" y1="100" x2="182" y2="100" stroke="#F0B429" stroke-width="1.5" stroke-opacity="0.25"/>
+  <!-- Center solid diamond -->
+  <path d="M100 82L118 100L100 118L82 100Z" fill="#F0B429"/>
+  <!-- Corner ticks -->
+  <line x1="100" y1="8"   x2="100" y2="24"  stroke="#F0B429" stroke-width="3" stroke-linecap="round"/>
+  <line x1="192" y1="100" x2="176" y2="100" stroke="#F0B429" stroke-width="3" stroke-linecap="round"/>
+  <line x1="100" y1="192" x2="100" y2="176" stroke="#F0B429" stroke-width="3" stroke-linecap="round"/>
+  <line x1="8"   y1="100" x2="24"  y2="100" stroke="#F0B429" stroke-width="3" stroke-linecap="round"/>
+</svg>
