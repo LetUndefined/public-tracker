@@ -13,9 +13,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       manifest: {
-        name: 'Challenge Tracker',
-        short_name: 'Challenges',
-        description: 'Live prop trading challenge dashboard',
+        name: 'Sentinel',
+        short_name: 'Sentinel',
+        description: 'Track your funded prop firm accounts in real time.',
         theme_color: '#06060b',
         background_color: '#06060b',
         display: 'standalone',
