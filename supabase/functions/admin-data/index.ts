@@ -55,9 +55,17 @@ Deno.serve(async (req) => {
 
     const { data: challenges, error: chErr } = await supabase
       .from('challenges')
-      .select('id, user_id, alias, starting_balance, target_pct, created_at')
+      .select('id, user_id, alias, prop_firm, phase, starting_balance, target_pct, created_at')
       .order('created_at', { ascending: false })
     if (chErr) return err(req, 'Failed to fetch challenges', 500, chErr.message)
+
+    // System-wide history stats
+    const { data: histRows } = await supabase
+      .from('challenge_history')
+      .select('outcome, payout_received')
+    const histPassed   = (histRows ?? []).filter((h: any) => h.outcome === 'Passed').length
+    const histFailed   = (histRows ?? []).filter((h: any) => h.outcome === 'Failed').length
+    const histExtracted = (histRows ?? []).reduce((s: number, h: any) => s + (h.payout_received ?? 0), 0)
 
     // Use RPC to check which users have API keys — never read vault.secrets directly
     let keyUserIds = new Set<string>()
@@ -78,7 +86,10 @@ Deno.serve(async (req) => {
       challenges: (challenges ?? []).filter((c: any) => c.user_id === u.id),
     }))
 
-    return new Response(JSON.stringify({ users: userData }), {
+    return new Response(JSON.stringify({
+      users: userData,
+      system: { histPassed, histFailed, histExtracted },
+    }), {
       headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
     })
 
