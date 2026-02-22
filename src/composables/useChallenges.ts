@@ -142,8 +142,9 @@ export function useChallenges() {
   })
 
   async function addChallenge(challenge: Omit<Challenge, 'id' | 'created_at'>) {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Not authenticated')
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.user) throw new Error('Not authenticated')
+    const user = session.user
     const { data, error: err } = await supabase
       .from('challenges')
       .insert({ ...challenge, user_id: user.id })

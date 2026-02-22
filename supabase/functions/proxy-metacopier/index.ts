@@ -22,6 +22,44 @@ function err(req: Request, msg: string, status: number, internal?: string) {
   })
 }
 
+// Verify and decode the Supabase JWT locally — no auth API round-trip.
+// Uses HMAC-SHA256 (Supabase's default JWT algorithm).
+async function verifyJwt(token: string, secret: string): Promise<{ sub: string } | null> {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify'],
+    )
+
+    const signedPart = parts[0] + '.' + parts[1]
+    const sigBytes = Uint8Array.from(
+      atob(parts[2].replace(/-/g, '+').replace(/_/g, '/')),
+      (c) => c.charCodeAt(0),
+    )
+
+    const valid = await crypto.subtle.verify(
+      'HMAC',
+      key,
+      sigBytes,
+      new TextEncoder().encode(signedPart),
+    )
+    if (!valid) return null
+
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+    if (payload.exp && payload.exp < Date.now() / 1000) return null
+
+    return { sub: payload.sub }
+  } catch {
+    return null
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsOk(req)
   if (req.method !== 'POST') return err(req, 'Method not allowed', 405)
@@ -31,16 +69,21 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) return err(req, 'Unauthorized', 401)
     const jwt = authHeader.slice(7)
 
+    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET')
+    if (!jwtSecret) return err(req, 'Server misconfigured', 500, 'Missing JWT secret')
+
+    const payload = await verifyJwt(jwt, jwtSecret)
+    if (!payload?.sub) return err(req, 'Unauthorized', 401)
+
+    const userId = payload.sub
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
 
-    const { data: { user }, error: authErr } = await supabase.auth.getUser(jwt)
-    if (authErr || !user) return err(req, 'Unauthorized', 401, authErr?.message)
-
     const { data: allowed, error: rlErr } = await supabase.rpc('check_rate_limit', {
-      p_user_id: user.id,
+      p_user_id: userId,
       p_endpoint: 'proxy-metacopier',
       p_max_calls: 60,   // ~6 calls per poll cycle × 10x burst headroom
       p_window_seconds: 60,
@@ -64,7 +107,7 @@ Deno.serve(async (req) => {
     }
 
     const { data: apiKey, error: vaultErr } = await supabase.rpc('get_metacopier_key', {
-      p_user_id: user.id,
+      p_user_id: userId,
     })
     if (vaultErr) return err(req, 'Service unavailable', 500, `Vault RPC: ${vaultErr.message}`)
     if (!apiKey) return err(req, 'API key not configured', 403)

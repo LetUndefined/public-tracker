@@ -26,7 +26,7 @@ let bootstrapped = false
 
 async function bootstrap() {
   bootstrapped = true
-  startAutoRefresh(30_000)
+  startAutoRefresh(60_000)
   await fetchChallenges()
 
   if (challengeRows.value.length > 0) {
