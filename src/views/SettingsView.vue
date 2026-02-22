@@ -12,6 +12,7 @@ const toast = useToast()
 const apiKey = ref('')
 const hasKey = ref(false)
 const saving = ref(false)
+const removing = ref(false)
 const saveError = ref('')
 const saveSuccess = ref(false)
 
@@ -49,6 +50,22 @@ async function saveApiKey() {
   }
 }
 
+async function removeApiKey() {
+  if (!confirm('Remove your MetaCopier API key? The app will stop syncing until you add a new one.')) return
+  removing.value = true
+  try {
+    const { error } = await supabase.rpc('delete_metacopier_key')
+    if (error) throw error
+    hasKey.value = false
+    saveSuccess.value = false
+    toast.success('API key removed')
+  } catch (e: any) {
+    toast.error(e.message ?? 'Failed to remove key')
+  } finally {
+    removing.value = false
+  }
+}
+
 async function handleSignOut() {
   await signOut()
   router.replace('/login')
@@ -78,6 +95,10 @@ async function handleSignOut() {
         <div class="key-status">
           <span v-if="hasKey" class="status-badge status-ok">● Key configured</span>
           <span v-else class="status-badge status-warn">● No key set — required to use the app</span>
+          <button v-if="hasKey" class="remove-key-btn" :disabled="removing" @click="removeApiKey">
+            <span v-if="removing" class="spinner spinner-red" />
+            {{ removing ? 'Removing…' : 'Remove Key' }}
+          </button>
         </div>
         <p class="card-desc">
           Your key is encrypted and stored server-side. It is never sent to your browser after saving.
@@ -175,7 +196,46 @@ async function handleSignOut() {
   color: var(--text-primary);
 }
 
-.key-status { display: flex; }
+.key-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.remove-key-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #ef4444;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.remove-key-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.remove-key-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinner-red {
+  border-color: rgba(239, 68, 68, 0.2);
+  border-top-color: #ef4444;
+}
 
 .status-badge {
   font-family: 'JetBrains Mono', monospace;
