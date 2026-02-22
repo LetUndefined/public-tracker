@@ -5,6 +5,7 @@ import { useNotifications } from '@/composables/useNotifications'
 import { useAuth } from '@/composables/useAuth'
 import { useAdmin } from '@/composables/useAdmin'
 import { useMasterToggle } from '@/composables/useMasterToggle'
+import FeedbackModal from '@/components/FeedbackModal.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,6 +80,7 @@ async function handleSignOut() {
           <span class="master-toggle-dot" />
           <span class="master-toggle-label">{{ includeMaster ? 'MASTER ON' : 'MASTER OFF' }}</span>
         </button>
+        <FeedbackModal />
         <router-link v-if="isAdmin" to="/admin" class="settings-btn admin-link" title="Admin">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
             <rect x="1.5" y="5.5" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/>

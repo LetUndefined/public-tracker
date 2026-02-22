@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAdmin } from '@/composables/useAdmin'
+import { supabase } from '@/lib/supabase'
 
 const { fetchAdminData } = useAdmin()
 const router = useRouter()
@@ -33,8 +34,19 @@ interface SystemStats {
   histExtracted: number
 }
 
+interface FeedbackRow {
+  id: string
+  user_id: string | null
+  email: string | null
+  message: string
+  category: 'bug' | 'feature' | 'general'
+  read: boolean
+  created_at: string
+}
+
 const users    = ref<UserRow[]>([])
 const system   = ref<SystemStats>({ histPassed: 0, histFailed: 0, histExtracted: 0 })
+const feedback = ref<FeedbackRow[]>([])
 const loading  = ref(true)
 const error    = ref('')
 const search   = ref('')
@@ -52,7 +64,8 @@ const stats = computed(() => {
   const active7d     = users.value.filter(u => u.last_sign_in && (now - new Date(u.last_sign_in).getTime()) < 7 * 864e5).length
   const newWeek      = users.value.filter(u => (now - new Date(u.created_at).getTime()) < 7 * 864e5).length
   const noActivity   = users.value.filter(u => !u.last_sign_in).length
-  return { total, confirmed, unconfirmed, withKey, totalCh, active7d, newWeek, noActivity }
+  const unreadFb     = feedback.value.filter(f => !f.read).length
+  return { total, confirmed, unconfirmed, withKey, totalCh, active7d, newWeek, noActivity, unreadFb }
 })
 
 // ── filtering + sorting ───────────────────────────────────────────
@@ -106,6 +119,20 @@ function fmtMoney(n: number) {
 
 function toggle(user: UserRow) { user.expanded = !user.expanded }
 
+async function markRead(id: string) {
+  const row = feedback.value.find(f => f.id === id)
+  if (!row || row.read) return
+  row.read = true // optimistic
+  const { fetchAdminData: _ } = useAdmin()
+  await supabase.functions.invoke('admin-data', { body: { action: 'markRead', id } })
+}
+
+function categoryLabel(c: string) {
+  if (c === 'bug') return '🐛 Bug'
+  if (c === 'feature') return '💡 Feature'
+  return '💬 General'
+}
+
 async function copyEmail(e: Event, email: string) {
   e.stopPropagation()
   await navigator.clipboard.writeText(email)
@@ -114,8 +141,9 @@ async function copyEmail(e: Event, email: string) {
 onMounted(async () => {
   try {
     const data = await fetchAdminData()
-    users.value  = (data.users  ?? []).map((u: any) => ({ ...u, expanded: false }))
-    system.value = data.system ?? { histPassed: 0, histFailed: 0, histExtracted: 0 }
+    users.value    = (data.users    ?? []).map((u: any) => ({ ...u, expanded: false }))
+    system.value   = data.system   ?? { histPassed: 0, histFailed: 0, histExtracted: 0 }
+    feedback.value = data.feedback ?? []
   } catch (e: any) {
     error.value = e.message
     if (e.message === 'Not authorized') router.replace('/')
@@ -184,6 +212,10 @@ onMounted(async () => {
           <div class="stat-cell">
             <div class="stat-val stat-accent">{{ fmtMoney(system.histExtracted) }}</div>
             <div class="stat-key">EXTRACTED</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val" :class="stats.unreadFb > 0 ? 'stat-accent' : ''">{{ stats.unreadFb }}</div>
+            <div class="stat-key">UNREAD FEEDBACK</div>
           </div>
         </div>
 
@@ -297,6 +329,31 @@ onMounted(async () => {
           </template>
         </div>
 
+        <!-- ── Feedback inbox ── -->
+        <div class="inbox-section" v-if="feedback.length > 0">
+          <div class="section-label">
+            FEEDBACK INBOX
+            <span v-if="stats.unreadFb > 0" class="inbox-badge">{{ stats.unreadFb }} unread</span>
+          </div>
+          <div class="inbox-list">
+            <div
+              v-for="fb in feedback"
+              :key="fb.id"
+              class="inbox-card"
+              :class="{ 'inbox-read': fb.read }"
+              @click="markRead(fb.id)"
+            >
+              <div class="inbox-card-top">
+                <span class="inbox-cat" :class="'cat-' + fb.category">{{ categoryLabel(fb.category) }}</span>
+                <span class="inbox-email">{{ fb.email ?? 'anonymous' }}</span>
+                <span class="inbox-time">{{ relTime(fb.created_at) }}</span>
+                <span v-if="!fb.read" class="inbox-dot" />
+              </div>
+              <div class="inbox-msg">{{ fb.message }}</div>
+            </div>
+          </div>
+        </div>
+
         <!-- ── System history summary ── -->
         <div class="system-section" v-if="system.histPassed + system.histFailed > 0">
           <div class="section-label">SYSTEM · CHALLENGE HISTORY</div>
@@ -372,7 +429,7 @@ onMounted(async () => {
 /* ── Stats strip ── */
 .stats-strip {
   display: grid;
-  grid-template-columns: repeat(8, 1fr);
+  grid-template-columns: repeat(9, 1fr);
   gap: 1px;
   background: var(--border-subtle);
   border: 1px solid var(--border-subtle);
@@ -773,9 +830,108 @@ onMounted(async () => {
   color: #ef4444;
 }
 
+/* ── Feedback inbox ── */
+.inbox-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inbox-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  color: #0a0b0f;
+  background: var(--accent);
+  border-radius: 4px;
+  padding: 2px 7px;
+  margin-left: 8px;
+  letter-spacing: 0.06em;
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inbox-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.15s, border-left-color 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inbox-card:hover { background: rgba(255,255,255,0.02); }
+
+.inbox-card.inbox-read {
+  border-left-color: var(--border-subtle);
+  opacity: 0.55;
+}
+
+.inbox-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.inbox-cat {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.cat-bug     { background: rgba(239,68,68,0.1);   color: #ef4444; }
+.cat-feature { background: rgba(34,197,94,0.1);   color: var(--green); }
+.cat-general { background: rgba(240,180,41,0.1);  color: var(--accent); }
+
+.inbox-email {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.inbox-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.inbox-msg {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
-  .stats-strip { grid-template-columns: repeat(4, 1fr); }
+  .stats-strip { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 640px) {

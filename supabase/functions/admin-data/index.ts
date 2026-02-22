@@ -18,6 +18,10 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) return err(req, 'Unauthorized', 401)
     const jwt = authHeader.slice(7)
 
+    // Parse optional action body early so we can branch below
+    let body: { action?: string; id?: string } = {}
+    try { body = await req.clone().json() } catch { /* no body is fine */ }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -29,6 +33,18 @@ Deno.serve(async (req) => {
     const { data: isAdmin, error: adminErr } = await supabase.rpc('is_admin', { p_user_id: user.id })
     if (adminErr) return err(req, 'Forbidden', 403, `Admin check: ${adminErr.message}`)
     if (!isAdmin) return err(req, 'Forbidden', 403)
+
+    // ── mark-as-read action ──────────────────────────────────────
+    if (body.action === 'markRead' && body.id) {
+      const { error: upErr } = await supabase
+        .from('feedback')
+        .update({ read: true })
+        .eq('id', body.id)
+      if (upErr) return err(req, 'Failed to update', 500, upErr.message)
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
+      })
+    }
 
     const { data: allowed, error: rlErr } = await supabase.rpc('check_rate_limit', {
       p_user_id: user.id,
@@ -58,6 +74,13 @@ Deno.serve(async (req) => {
       .select('id, user_id, alias, prop_firm, phase, starting_balance, target_pct, created_at')
       .order('created_at', { ascending: false })
     if (chErr) return err(req, 'Failed to fetch challenges', 500, chErr.message)
+
+    // Feedback inbox
+    const { data: feedbackRows } = await supabase
+      .from('feedback')
+      .select('id, user_id, email, message, category, read, created_at')
+      .order('created_at', { ascending: false })
+      .limit(200)
 
     // System-wide history stats
     const { data: histRows } = await supabase
@@ -89,6 +112,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       users: userData,
       system: { histPassed, histFailed, histExtracted },
+      feedback: feedbackRows ?? [],
     }), {
       headers: { ...corsHeaders(req), 'Content-Type': 'application/json' },
     })
