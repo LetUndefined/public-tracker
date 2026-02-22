@@ -69,18 +69,24 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) return err(req, 'Unauthorized', 401)
     const jwt = authHeader.slice(7)
 
-    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET')
-    if (!jwtSecret) return err(req, 'Server misconfigured', 500, 'Missing JWT secret')
-
-    const payload = await verifyJwt(jwt, jwtSecret)
-    if (!payload?.sub) return err(req, 'Unauthorized', 401)
-
-    const userId = payload.sub
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
+
+    // Prefer local JWT verification (no auth API round-trip).
+    // Falls back to getUser() if SUPABASE_JWT_SECRET is not set as a secret.
+    let userId: string
+    const jwtSecret = Deno.env.get('SUPABASE_JWT_SECRET')
+    if (jwtSecret) {
+      const payload = await verifyJwt(jwt, jwtSecret)
+      if (!payload?.sub) return err(req, 'Unauthorized', 401)
+      userId = payload.sub
+    } else {
+      const { data: { user }, error: authErr } = await supabase.auth.getUser(jwt)
+      if (authErr || !user) return err(req, 'Unauthorized', 401, authErr?.message)
+      userId = user.id
+    }
 
     const { data: allowed, error: rlErr } = await supabase.rpc('check_rate_limit', {
       p_user_id: userId,
