@@ -9,6 +9,9 @@ const lastTradeMap = ref<Record<string, string>>({})
 const tradeCountMap = ref<Record<string, number>>({})
 const streakMap = ref<Record<string, { direction: 'W' | 'L'; count: number } | null>>({})
 const dailyPnlMap = ref<Record<string, number>>({})
+// Shared trade cache — populated by fetchAccounts, consumed by useNotifications
+// so trades are never fetched twice per cycle
+const tradesMap = ref<Record<string, MetaCopierTrade[]>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -35,15 +38,17 @@ function computeStreak(trades: MetaCopierTrade[]): { direction: 'W' | 'L'; count
   return { direction, count }
 }
 
-let refreshInterval: ReturnType<typeof setInterval> | null = null
+let liveInterval: ReturnType<typeof setInterval> | null = null
+let fullInterval: ReturnType<typeof setInterval> | null = null
 
 export function useMetaCopier() {
-  async function fetchAccounts() {
+  // Fast path: only accounts list + open positions (live PNL)
+  // Called every 30s — 1 + N proxy calls per cycle
+  async function fetchLive() {
     loading.value = true
     error.value = null
     try {
       accounts.value = await getAccounts()
-      // Fetch open positions (PNL, TP, SL) in parallel
       const posEntries = await Promise.all(
         accounts.value.map(async (acc) => {
           const info = await getOpenPositions(acc.id)
@@ -51,8 +56,18 @@ export function useMetaCopier() {
         })
       )
       openPositionsMap.value = Object.fromEntries(posEntries)
+    } catch (e: any) {
+      error.value = e.message
+      console.error('Failed to fetch MetaCopier accounts:', e)
+    } finally {
+      loading.value = false
+    }
+  }
 
-      // Fetch trade history for last trade time and total count
+  // Slow path: trade history for streak, daily PNL, last trade, notifications cache
+  // Called every 90s — N proxy calls per cycle, results shared via tradesMap
+  async function fetchHistory() {
+    try {
       const tradeResults = await Promise.all(
         accounts.value.map(async (acc) => {
           try {
@@ -66,25 +81,31 @@ export function useMetaCopier() {
               })
               lastTime = sorted[0].close_time ?? sorted[0].open_time
             }
-            return { id: acc.id, lastTime, count: trades.length, streak: computeStreak(trades), dailyPnl: computeDailyPnl(trades) }
+            return { id: acc.id, trades, lastTime, count: trades.length, streak: computeStreak(trades), dailyPnl: computeDailyPnl(trades) }
           } catch {
-            return { id: acc.id, lastTime: '', count: 0, streak: null, dailyPnl: 0 }
+            return { id: acc.id, trades: [] as MetaCopierTrade[], lastTime: '', count: 0, streak: null, dailyPnl: 0 }
           }
         })
       )
+      tradesMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.trades]))
       lastTradeMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.lastTime]))
       tradeCountMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.count]))
       streakMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.streak]))
       dailyPnlMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.dailyPnl]))
     } catch (e: any) {
-      error.value = e.message
-      console.error('Failed to fetch MetaCopier accounts:', e)
-    } finally {
-      loading.value = false
+      console.error('Failed to fetch trade history:', e)
     }
   }
 
+  // Full refresh: live + history together (used on mount)
+  async function fetchAccounts() {
+    await fetchLive()
+    await fetchHistory()
+  }
+
   async function fetchTrades(accountId: string, daysBack = 30): Promise<MetaCopierTrade[]> {
+    // Return cached trades if available — avoids a redundant proxy call
+    if (tradesMap.value[accountId]?.length) return tradesMap.value[accountId]
     try {
       return await getAccountTrades(accountId, daysBack)
     } catch (e: any) {
@@ -93,17 +114,18 @@ export function useMetaCopier() {
     }
   }
 
-  function startAutoRefresh(intervalMs = 30_000) {
+  function startAutoRefresh(liveMs = 30_000, historyMs = 90_000) {
     stopAutoRefresh()
     fetchAccounts()
-    refreshInterval = setInterval(fetchAccounts, intervalMs)
+    // Live positions refresh every 30s
+    liveInterval = setInterval(fetchLive, liveMs)
+    // Trade history refresh every 90s (also updates notification cache)
+    fullInterval = setInterval(fetchHistory, historyMs)
   }
 
   function stopAutoRefresh() {
-    if (refreshInterval) {
-      clearInterval(refreshInterval)
-      refreshInterval = null
-    }
+    if (liveInterval) { clearInterval(liveInterval); liveInterval = null }
+    if (fullInterval) { clearInterval(fullInterval); fullInterval = null }
   }
 
   return {
@@ -113,6 +135,7 @@ export function useMetaCopier() {
     tradeCountMap,
     streakMap,
     dailyPnlMap,
+    tradesMap,
     loading,
     error,
     fetchAccounts,

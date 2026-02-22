@@ -43,6 +43,8 @@ export function useNotifications() {
         // Skip master accounts unless toggled on
         if (row?.is_master && !includeMaster.value) continue
 
+        // Use cached trades from useMetaCopier (populated by fetchHistory every 90s)
+        // to avoid fetching trade history a second time on this cycle
         const trades = await fetchTrades(ch.metacopier_account_id)
         const alias = row?.alias ?? ch.alias ?? ch.login_number
 
@@ -156,7 +158,7 @@ export function useNotifications() {
     }
   })
 
-  function startPolling(intervalMs = 15_000) {
+  function startPolling(intervalMs = 90_000) {
     stopPolling()
     pollForNewTrades()
     pollInterval = setInterval(pollForNewTrades, intervalMs)

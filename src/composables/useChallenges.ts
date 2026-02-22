@@ -65,22 +65,29 @@ export function useChallenges() {
   }
 
   async function fetchStartingBalances() {
-    for (const ch of challenges.value) {
-      if (startingBalances.value[ch.id]) continue
-      try {
-        const { data } = await supabase
-          .from('snapshots')
-          .select('balance')
-          .eq('challenge_id', ch.id)
-          .order('timestamp', { ascending: true })
-          .limit(1)
-          .maybeSingle()
-        if (data?.balance) {
-          startingBalances.value[ch.id] = data.balance
+    const missing = challenges.value
+      .filter(ch => !startingBalances.value[ch.id])
+      .map(ch => ch.id)
+    if (!missing.length) return
+    try {
+      // Fetch the earliest snapshot per challenge in a single query
+      const { data } = await supabase
+        .from('snapshots')
+        .select('challenge_id, balance')
+        .in('challenge_id', missing)
+        .order('timestamp', { ascending: true })
+      if (data) {
+        // Only keep the first (earliest) row per challenge_id
+        const seen = new Set<string>()
+        for (const row of data) {
+          if (!seen.has(row.challenge_id) && row.balance) {
+            startingBalances.value[row.challenge_id] = row.balance
+            seen.add(row.challenge_id)
+          }
         }
-      } catch {
-        // No snapshot yet, will use current balance
       }
+    } catch {
+      // No snapshots yet, will use current balance
     }
   }
 
