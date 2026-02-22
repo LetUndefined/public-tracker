@@ -138,6 +138,14 @@ async function handleSignOut() {
   display: flex;
   align-items: center;
   gap: 10px;
+  text-decoration: none;
+  outline: none;
+}
+
+.navbar-brand:hover,
+.navbar-brand.router-link-active,
+.navbar-brand.router-link-exact-active {
+  text-decoration: none;
 }
 
 .brand-mark {

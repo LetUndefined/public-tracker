@@ -36,8 +36,8 @@ const router = createRouter({
 // Auth guard
 router.beforeEach(async (to) => {
   if (to.meta.public) {
-    // Redirect authenticated users away from landing/login to dashboard
-    if (to.path === '/' || to.path === '/login') {
+    // Redirect authenticated users away from login to dashboard
+    if (to.path === '/login') {
       const { data } = await supabase.auth.getSession()
       if (data.session) return '/dashboard'
     }
