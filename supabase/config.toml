@@ -1,0 +1,8 @@
+[functions.proxy-metacopier]
+verify_jwt = false
+
+[functions.save-api-key]
+verify_jwt = false
+
+[functions.admin-data]
+verify_jwt = false

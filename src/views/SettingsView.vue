@@ -1,0 +1,296 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuth } from '@/composables/useAuth'
+import { useToast } from '@/composables/useToast'
+import { supabase } from '@/lib/supabase'
+
+const { user, signOut } = useAuth()
+const router = useRouter()
+const toast = useToast()
+
+const apiKey = ref('')
+const hasKey = ref(false)
+const saving = ref(false)
+const saveError = ref('')
+const saveSuccess = ref(false)
+
+onMounted(async () => {
+  const { data } = await supabase.rpc('has_metacopier_key')
+  hasKey.value = !!data
+})
+
+async function saveApiKey() {
+  saveError.value = ''
+  saveSuccess.value = false
+
+  if (!apiKey.value.trim()) {
+    saveError.value = 'API key cannot be empty'
+    return
+  }
+
+  saving.value = true
+  try {
+    const { error: fnError } = await supabase.functions.invoke('save-api-key', {
+      body: { api_key: apiKey.value },
+    })
+
+    if (fnError) throw new Error(fnError.message ?? 'Failed to save')
+
+    hasKey.value = true
+    saveSuccess.value = true
+    apiKey.value = ''
+    toast.success('API key saved — accounts will sync shortly')
+  } catch (e: any) {
+    saveError.value = e.message ?? 'Something went wrong'
+    toast.error(saveError.value)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleSignOut() {
+  await signOut()
+  router.replace('/login')
+}
+</script>
+
+<template>
+  <div class="settings-page">
+    <div class="settings-inner">
+      <div class="page-header">
+        <span class="page-tag">▸ SETTINGS</span>
+        <h1 class="page-title">Account Settings</h1>
+      </div>
+
+      <!-- User info -->
+      <section class="settings-card">
+        <div class="card-label">ACCOUNT</div>
+        <div class="user-row">
+          <div class="user-email">{{ user?.email }}</div>
+          <button class="danger-btn" @click="handleSignOut">Sign Out</button>
+        </div>
+      </section>
+
+      <!-- API Key -->
+      <section class="settings-card">
+        <div class="card-label">METACOPIER API KEY</div>
+        <div class="key-status">
+          <span v-if="hasKey" class="status-badge status-ok">● Key configured</span>
+          <span v-else class="status-badge status-warn">● No key set — required to use the app</span>
+        </div>
+        <p class="card-desc">
+          Your key is encrypted and stored server-side. It is never sent to your browser after saving.
+          Enter a new key below to update it.
+        </p>
+        <form class="field" @submit.prevent="saveApiKey">
+          <input type="text" name="username" autocomplete="username" style="display:none" />
+          <input
+            v-model="apiKey"
+            type="password"
+            class="field-input"
+            placeholder="Paste your MetaCopier API key…"
+            autocomplete="new-password"
+          />
+        </form>
+        <div v-if="saveError" class="alert alert-error">{{ saveError }}</div>
+        <div v-if="saveSuccess" class="alert alert-ok">API key saved successfully.</div>
+        <div class="card-actions">
+          <button class="save-btn" :disabled="saving || !apiKey" @click="saveApiKey">
+            <span v-if="saving" class="spinner" />
+            {{ saving ? 'Validating…' : 'Save Key' }}
+          </button>
+          <button v-if="hasKey" class="ghost-btn" @click="router.replace('/')">
+            Go to Dashboard
+          </button>
+        </div>
+      </section>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.settings-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+.settings-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.page-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.settings-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg, 12px);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  color: var(--text-muted);
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.user-email {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.key-status { display: flex; }
+
+.status-badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.status-ok  { color: var(--green, #22c55e); }
+.status-warn { color: var(--accent); }
+
+.card-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.field-input {
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.field-input:focus { border-color: var(--accent); }
+
+.alert {
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+}
+
+.alert-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.alert-ok {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  color: var(--green, #22c55e);
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.save-btn {
+  padding: 10px 20px;
+  background: var(--accent);
+  color: #0f1115;
+  border: none;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.15s;
+}
+
+.save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.save-btn:not(:disabled):hover { opacity: 0.88; }
+
+.ghost-btn {
+  padding: 10px 20px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.ghost-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.danger-btn {
+  padding: 7px 14px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 7px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ef4444;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.danger-btn:hover { background: rgba(239, 68, 68, 0.2); }
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0,0,0,0.2);
+  border-top-color: #0f1115;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>

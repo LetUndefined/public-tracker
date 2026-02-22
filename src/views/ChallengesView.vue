@@ -2,6 +2,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useMetaCopier } from '@/composables/useMetaCopier'
 import { useChallenges } from '@/composables/useChallenges'
+import { useToast } from '@/composables/useToast'
+import { useMasterToggle } from '@/composables/useMasterToggle'
 import type { ChallengeRow } from '@/types'
 import StatsBar from '@/components/StatsBar.vue'
 import FilterBar from '@/components/FilterBar.vue'
@@ -18,11 +20,12 @@ const {
   captureSnapshots,
   loading: chLoading,
 } = useChallenges()
+const toast = useToast()
 
 const search = ref('')
 const ownerFilter = ref('')
 const statusFilter = ref('')
-const showMaster = ref(false)
+const { includeMaster: showMaster } = useMasterToggle()
 const showModal = ref(false)
 const showEditModal = ref(false)
 const editingRow = ref<ChallengeRow | null>(null)
@@ -49,7 +52,12 @@ const filteredRows = computed(() => {
 
 async function handleDelete(id: string) {
   if (confirm('Remove this challenge?')) {
-    await deleteChallenge(id)
+    try {
+      await deleteChallenge(id)
+      toast.success('Challenge removed')
+    } catch (e: any) {
+      toast.error(e.message ?? 'Failed to remove challenge')
+    }
   }
 }
 
@@ -144,14 +152,14 @@ onUnmounted(() => {
       :show="showModal"
       :unlinked-accounts="unlinkedAccounts"
       @close="showModal = false"
-      @added="fetchChallenges()"
+      @added="showModal = false; fetchChallenges(); toast.success('Challenge added')"
     />
 
     <EditChallengeModal
       :show="showEditModal"
       :row="editingRow"
       @close="showEditModal = false; editingRow = null"
-      @saved="fetchChallenges()"
+      @saved="showEditModal = false; editingRow = null; fetchChallenges(); toast.success('Challenge updated')"
     />
   </div>
 </template>

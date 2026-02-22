@@ -1,11 +1,20 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useNotifications } from '@/composables/useNotifications'
+import { useAuth } from '@/composables/useAuth'
+import { useAdmin } from '@/composables/useAdmin'
+import { useMasterToggle } from '@/composables/useMasterToggle'
 
 const route = useRoute()
+const router = useRouter()
 const { unreadCount } = useNotifications()
+const { user, signOut } = useAuth()
+const { isAdmin, checkAdmin } = useAdmin()
+const { includeMaster } = useMasterToggle()
 const mobileOpen = ref(false)
+
+checkAdmin()
 
 const navItems = [
   { path: '/', label: 'Challenges' },
@@ -13,9 +22,13 @@ const navItems = [
   { path: '/analytics', label: 'Analytics' },
   { path: '/payouts', label: 'Payouts' },
   { path: '/history', label: 'History' },
-  { path: '/compare', label: 'Compare' },
-  { path: '/prop-firms', label: 'Prop Firms' },
+  { path: '/compare', label: 'Compare Prop Firms' },
 ]
+
+async function handleSignOut() {
+  await signOut()
+  router.replace('/login')
+}
 </script>
 
 <template>
@@ -56,6 +69,33 @@ const navItems = [
           <span class="live-dot" />
           <span class="live-text">LIVE</span>
         </div>
+        <button
+          class="master-toggle"
+          :class="{ active: includeMaster }"
+          @click="includeMaster = !includeMaster"
+          :title="includeMaster ? 'Master data included — click to exclude' : 'Click to include master account data'"
+        >
+          <span class="master-toggle-dot" />
+          <span class="master-toggle-label">{{ includeMaster ? 'MASTER ON' : 'MASTER OFF' }}</span>
+        </button>
+        <router-link v-if="isAdmin" to="/admin" class="settings-btn admin-link" title="Admin">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <rect x="1.5" y="5.5" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+            <path d="M5 5.5V4a2.5 2.5 0 015 0v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <circle cx="7.5" cy="9.5" r="1" fill="currentColor"/>
+          </svg>
+        </router-link>
+        <router-link to="/settings" class="settings-btn" title="Settings">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
+            <path d="M6.07 1.5a.5.5 0 00-.49.4l-.2 1.02a4.5 4.5 0 00-.9.52l-.98-.33a.5.5 0 00-.59.23L1.91 4.66a.5.5 0 00.1.63l.79.67a4.6 4.6 0 000 1.08l-.79.67a.5.5 0 00-.1.63l1.03 1.78a.5.5 0 00.59.23l.97-.33c.29.2.59.38.91.52l.2 1.02a.5.5 0 00.49.4h2.06a.5.5 0 00.49-.4l.2-1.02c.32-.14.62-.32.91-.52l.97.33a.5.5 0 00.59-.23l1.03-1.78a.5.5 0 00-.1-.63l-.79-.67c.02-.18.03-.36.03-.54s-.01-.36-.03-.54l.79-.67a.5.5 0 00.1-.63L11.1 3.34a.5.5 0 00-.59-.23l-.98.33a4.5 4.5 0 00-.9-.52l-.2-1.02a.5.5 0 00-.49-.4H6.07z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>
+            <circle cx="7.5" cy="7.5" r="1.5" stroke="currentColor" stroke-width="1.1"/>
+          </svg>
+        </router-link>
+        <button class="signout-btn" @click="handleSignOut" title="Sign out">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M5 2H2a1 1 0 00-1 1v8a1 1 0 001 1h3M9 10l3-3-3-3M12 7H5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
         <button class="hamburger" @click="mobileOpen = !mobileOpen" :class="{ open: mobileOpen }">
           <span /><span /><span />
         </button>
@@ -176,6 +216,99 @@ const navItems = [
 .navbar-right {
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+.settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+}
+
+.settings-btn:hover,
+.settings-btn.router-link-active {
+  color: var(--accent);
+  background: var(--surface);
+}
+
+.admin-link.router-link-active { color: #ef4444; }
+
+.master-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.master-toggle:hover {
+  border-color: var(--accent);
+}
+
+.master-toggle.active {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb, 99, 102, 241), 0.1);
+}
+
+.master-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.master-toggle.active .master-toggle-dot {
+  background: var(--accent);
+}
+
+.master-toggle-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+
+.master-toggle.active .master-toggle-label {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .master-toggle-label {
+    display: none;
+  }
+}
+
+.signout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.signout-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .live-indicator {

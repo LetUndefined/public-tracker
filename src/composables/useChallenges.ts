@@ -74,7 +74,7 @@ export function useChallenges() {
           .eq('challenge_id', ch.id)
           .order('timestamp', { ascending: true })
           .limit(1)
-          .single()
+          .maybeSingle()
         if (data?.balance) {
           startingBalances.value[ch.id] = data.balance
         }
@@ -135,9 +135,11 @@ export function useChallenges() {
   })
 
   async function addChallenge(challenge: Omit<Challenge, 'id' | 'created_at'>) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
     const { data, error: err } = await supabase
       .from('challenges')
-      .insert(challenge)
+      .insert({ ...challenge, user_id: user.id })
       .select()
       .single()
 

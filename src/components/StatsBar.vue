@@ -2,12 +2,16 @@
 import { computed, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import type { ChallengeRow } from '@/types'
+import { useMasterToggle } from '@/composables/useMasterToggle'
 
 const props = defineProps<{
   rows: ChallengeRow[]
 }>()
 
-const nonMaster = computed(() => props.rows.filter(r => !r.is_master))
+const { includeMaster } = useMasterToggle()
+const nonMaster = computed(() =>
+  includeMaster.value ? props.rows : props.rows.filter(r => !r.is_master)
+)
 
 const streak = computed(() => {
   for (const r of props.rows) {
@@ -32,7 +36,7 @@ const avgProgress = computed(() => {
 })
 
 const phaseFunnel = computed(() => {
-  const nonMasterRows = props.rows.filter(r => !r.is_master)
+  const nonMasterRows = nonMaster.value
   const counts: Record<string, number> = {}
   for (const r of nonMasterRows) {
     counts[r.phase] = (counts[r.phase] ?? 0) + 1

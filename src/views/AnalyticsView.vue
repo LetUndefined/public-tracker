@@ -2,10 +2,12 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useChallenges } from '@/composables/useChallenges'
 import { useMetaCopier } from '@/composables/useMetaCopier'
+import { useMasterToggle } from '@/composables/useMasterToggle'
 import type { MetaCopierTrade } from '@/types'
 
 const { challengeRows } = useChallenges()
 const { fetchTrades } = useMetaCopier()
+const { includeMaster } = useMasterToggle()
 
 interface ClosedTrade extends MetaCopierTrade {
   accountId: string
@@ -49,7 +51,7 @@ interface CalendarMonth {
   weeks: CalendarDay[][]
 }
 
-const TRADING_START = '2026-02-01'
+const DAYS_BACK = 1095 // fetch up to 3 years of history
 
 const loading = ref(false)
 const accountStats = ref<AccountStats[]>([])
@@ -79,13 +81,6 @@ const canGoNext = computed(() => {
   )
 })
 
-const canGoPrev = computed(() => {
-  const start = new Date(TRADING_START + 'T00:00:00')
-  return (
-    calendarDate.value.getFullYear() > start.getFullYear() ||
-    calendarDate.value.getMonth() > start.getMonth()
-  )
-})
 
 const overallStats = computed(() => {
   const stats = accountStats.value
@@ -121,10 +116,10 @@ const overallStats = computed(() => {
   }
 })
 
-function buildDateRange(): { days: DayPnl[]; dayMap: Record<string, number> } {
+function buildDateRange(startDate: string): { days: DayPnl[]; dayMap: Record<string, number> } {
   const days: DayPnl[] = []
   const dayMap: Record<string, number> = {}
-  const cursor = new Date(TRADING_START + 'T12:00:00')
+  const cursor = new Date(startDate + 'T12:00:00')
   const today = new Date()
   today.setHours(23, 59, 59, 999)
   while (cursor <= today) {
@@ -144,20 +139,31 @@ async function loadAnalytics() {
   loading.value = true
   try {
     const rows = challengeRows.value
-    const { days, dayMap } = buildDateRange()
-
-    // Only fetch back to TRADING_START
-    const daysBack = Math.ceil((Date.now() - new Date(TRADING_START + 'T00:00:00').getTime()) / 86_400_000) + 1
-
     const allClosed: ClosedTrade[] = []
     const results: AccountStats[] = []
 
-    await Promise.all(rows.map(async (row) => {
-      if (row.is_master) return  // skip master account entirely
-      const trades = await fetchTrades(row.metacopier_account_id, daysBack)
-      const closed = trades.filter(t => t.close_time !== null && (t.close_time ?? '') >= TRADING_START)
+    // Step 1: fetch all trades in parallel
+    const tradesByRow = await Promise.all(rows.map(async (row) => {
+      if (row.is_master && !includeMaster.value) return { row, sorted: [] }
+      const trades = await fetchTrades(row.metacopier_account_id, DAYS_BACK)
+      const closed = trades.filter(t => t.close_time !== null)
       const sorted = [...closed].sort((a, b) => (a.close_time ?? '').localeCompare(b.close_time ?? ''))
+      return { row, sorted }
+    }))
 
+    // Step 2: find earliest trade date to build dynamic range
+    let earliestDate = new Date().toISOString().slice(0, 10)
+    for (const { sorted } of tradesByRow) {
+      for (const t of sorted) {
+        const d = (t.close_time ?? '').slice(0, 10)
+        if (d && d < earliestDate) earliestDate = d
+      }
+    }
+    const { days, dayMap } = buildDateRange(earliestDate)
+
+    // Step 3: accumulate stats
+    for (const { row, sorted } of tradesByRow) {
+      if (!sorted.length) continue
       let wins = 0, losses = 0, grossProfit = 0, grossLoss = 0, netPnl = 0
       let bestTrade = 0, worstTrade = 0
 
@@ -185,7 +191,7 @@ async function loadAnalytics() {
         bestTrade: Math.round(bestTrade * 100) / 100,
         worstTrade: Math.round(worstTrade * 100) / 100,
       })
-    }))
+    }
 
     accountStats.value = results
     allClosedTrades.value = allClosed
@@ -242,22 +248,29 @@ function handleKeydown(e: KeyboardEvent) {
   if (e.key === 'Escape') closeDayModal()
 }
 
+// Reload when master toggle changes
+watch(includeMaster, () => {
+  if (challengeRows.value.length > 0) loadAnalytics()
+})
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
 
-  // Wait for challengeRows to be populated (they load async from App.vue),
-  // then load analytics once. This handles both direct navigation and
-  // arriving from another page where rows are already loaded.
-  const unwatch = watch(
-    () => challengeRows.value.length,
-    (len) => {
-      if (len > 0) {
-        unwatch()
-        loadAnalytics()
+  // If data is already loaded (navigated from another page), run immediately.
+  // Otherwise watch until challengeRows are populated (direct page load).
+  if (challengeRows.value.length > 0) {
+    loadAnalytics()
+  } else {
+    const unwatch = watch(
+      () => challengeRows.value.length,
+      (len) => {
+        if (len > 0) {
+          unwatch()
+          loadAnalytics()
+        }
       }
-    },
-    { immediate: true }
-  )
+    )
+  }
 })
 
 onUnmounted(() => {
@@ -653,7 +666,7 @@ function wrColor(wr: number, has: boolean): string {
 
         <!-- Month navigation bar -->
         <div class="cal-nav-bar">
-          <button class="cal-nav-btn" @click="prevMonth" :disabled="!canGoPrev" title="Previous month">
+          <button class="cal-nav-btn" @click="prevMonth" title="Previous month">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M9 11L5 7L9 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -1795,12 +1808,11 @@ function wrColor(wr: number, has: boolean): string {
   .cal-dow { font-size: 9px; }
 
   /* Modal mobile */
-  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal-backdrop { padding: 16px; align-items: center; }
   .day-modal {
     max-width: 100%;
     max-height: 88vh;
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-    border-bottom: none;
+    border-radius: var(--radius-md);
   }
   .modal-col-header,
   .trade-card {

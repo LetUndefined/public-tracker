@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useNotifications } from '@/composables/useNotifications'
 import { usePushNotifications } from '@/composables/usePushNotifications'
 import type { TradeNotification } from '@/composables/useNotifications'
 
-const { notifications, loading, includeMaster, startPolling, stopPolling } = useNotifications()
+const { notifications, loading, includeMaster } = useNotifications()
 const { supported: pushSupported, permission: pushPermission, requestPermission, notify } = usePushNotifications()
 
 async function testNotification() {
@@ -122,8 +122,6 @@ function isBuy(side: string): boolean {
   return s.includes('buy') || s === 'long'
 }
 
-onMounted(() => startPolling(15_000))
-onUnmounted(() => stopPolling())
 </script>
 
 <template>
