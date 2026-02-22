@@ -193,18 +193,35 @@ function fmtDate(d: string | null) {
   return d.slice(0, 10)
 }
 
+function phaseKey(phase: string): 'p1' | 'p2' | 'funded' | null {
+  const p = phase.toLowerCase()
+  if (/fund/.test(p)) return 'funded'
+  if (/1/.test(p)) return 'p1'
+  if (/2/.test(p)) return 'p2'
+  return null
+}
+
+function avgDaysByPhase(outcome: 'Passed' | 'Failed') {
+  const rows = entries.value.filter(e => e.outcome === outcome && e.duration_days !== null)
+  const avg = (list: typeof rows) =>
+    list.length ? Math.round(list.reduce((s, e) => s + e.duration_days!, 0) / list.length) : null
+  return {
+    p1:     avg(rows.filter(e => phaseKey(e.phase) === 'p1')),
+    p2:     avg(rows.filter(e => phaseKey(e.phase) === 'p2')),
+    funded: avg(rows.filter(e => phaseKey(e.phase) === 'funded')),
+    hasAny: rows.length > 0,
+  }
+}
+
 const stats = computed(() => {
   const passed   = entries.value.filter(e => e.outcome === 'Passed').length
   const failed   = entries.value.filter(e => e.outcome === 'Failed').length
   const total    = entries.value.length
   const payout   = entries.value.reduce((s, e) => s + (e.payout_received ?? 0), 0)
   const passRate = total > 0 ? Math.round(passed / total * 100) : 0
-  const avgDur   = (() => {
-    const valid = entries.value.filter(e => e.duration_days !== null)
-    if (!valid.length) return null
-    return Math.round(valid.reduce((s, e) => s + e.duration_days!, 0) / valid.length)
-  })()
-  return { passed, failed, total, payout, passRate, avgDur }
+  const passAvg  = avgDaysByPhase('Passed')
+  const failAvg  = avgDaysByPhase('Failed')
+  return { passed, failed, total, payout, passRate, passAvg, failAvg }
 })
 
 onMounted(async () => {
@@ -255,11 +272,50 @@ onMounted(async () => {
         <div class="sb-label">TOTAL EXTRACTED</div>
         <div class="sb-val sb-accent">{{ fmt(stats.payout) }}</div>
       </div>
-      <template v-if="stats.avgDur !== null">
+      <template v-if="stats.passAvg.hasAny">
         <div class="sb-sep" />
-        <div class="sb-cell">
-          <div class="sb-label">AVG DAYS</div>
-          <div class="sb-val">{{ stats.avgDur }}<span class="sb-unit">d</span></div>
+        <div class="sb-cell sb-cell--phases">
+          <div class="sb-label sb-label--green">AVG DAYS · PASS</div>
+          <div class="sb-phase-rows">
+            <div class="sb-phase-row" v-if="stats.passAvg.p1 !== null">
+              <span class="sb-phase-tag">PH1</span>
+              <span class="sb-phase-val">{{ stats.passAvg.p1 }}<span class="sb-phase-unit">d</span></span>
+            </div>
+            <div class="sb-phase-row" v-if="stats.passAvg.p2 !== null">
+              <span class="sb-phase-tag">PH2</span>
+              <span class="sb-phase-val">{{ stats.passAvg.p2 }}<span class="sb-phase-unit">d</span></span>
+            </div>
+            <div class="sb-phase-row" v-if="stats.passAvg.funded !== null">
+              <span class="sb-phase-tag">FND</span>
+              <span class="sb-phase-val">{{ stats.passAvg.funded }}<span class="sb-phase-unit">d</span></span>
+            </div>
+            <div class="sb-phase-row sb-phase-empty" v-if="stats.passAvg.p1 === null && stats.passAvg.p2 === null && stats.passAvg.funded === null">
+              <span class="sb-phase-val">—</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template v-if="stats.failAvg.hasAny">
+        <div class="sb-sep" />
+        <div class="sb-cell sb-cell--phases">
+          <div class="sb-label sb-label--red">AVG DAYS · FAIL</div>
+          <div class="sb-phase-rows">
+            <div class="sb-phase-row" v-if="stats.failAvg.p1 !== null">
+              <span class="sb-phase-tag">PH1</span>
+              <span class="sb-phase-val">{{ stats.failAvg.p1 }}<span class="sb-phase-unit">d</span></span>
+            </div>
+            <div class="sb-phase-row" v-if="stats.failAvg.p2 !== null">
+              <span class="sb-phase-tag">PH2</span>
+              <span class="sb-phase-val">{{ stats.failAvg.p2 }}<span class="sb-phase-unit">d</span></span>
+            </div>
+            <div class="sb-phase-row" v-if="stats.failAvg.funded !== null">
+              <span class="sb-phase-tag">FND</span>
+              <span class="sb-phase-val">{{ stats.failAvg.funded }}<span class="sb-phase-unit">d</span></span>
+            </div>
+            <div class="sb-phase-row sb-phase-empty" v-if="stats.failAvg.p1 === null && stats.failAvg.p2 === null && stats.failAvg.funded === null">
+              <span class="sb-phase-val">—</span>
+            </div>
+          </div>
         </div>
       </template>
 
@@ -627,6 +683,58 @@ onMounted(async () => {
 .sb-green  { color: var(--green); }
 .sb-red    { color: var(--red); }
 .sb-accent { color: var(--accent); }
+
+.sb-label--green { color: var(--green); opacity: 0.9; }
+.sb-label--red   { color: var(--red);   opacity: 0.9; }
+
+.sb-cell--phases {
+  justify-content: flex-start;
+  gap: 6px;
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.sb-phase-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sb-phase-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.sb-phase-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text-muted);
+  width: 26px;
+  flex-shrink: 0;
+}
+
+.sb-phase-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.sb-phase-unit {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.55;
+}
+
+.sb-phase-empty .sb-phase-val {
+  font-size: 16px;
+  color: var(--text-muted);
+}
 
 /* ── Alert banner ────────────────────────────────────────────── */
 .alert-banner {
