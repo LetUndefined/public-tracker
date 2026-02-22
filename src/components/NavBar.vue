@@ -23,7 +23,7 @@ const navItems = [
   { path: '/analytics', label: 'Analytics', tour: 'nav-analytics' },
   { path: '/payouts', label: 'Payouts', tour: 'nav-payouts' },
   { path: '/history', label: 'History', tour: '' },
-  { path: '/compare', label: 'Compare Prop Firms', tour: 'nav-compare' },
+  { path: '/compare', label: 'Compare Prop Firms', tour: 'nav-compare', beta: true },
 ]
 
 async function handleSignOut() {
@@ -59,6 +59,7 @@ async function handleSignOut() {
           @click="mobileOpen = false"
         >
           <span class="nav-label">{{ item.label }}</span>
+          <span v-if="item.beta" class="beta-tag">BETA</span>
           <span class="nav-indicator" />
           <span
             v-if="item.path === '/notifications' && unreadCount > 0"
@@ -208,6 +209,19 @@ async function handleSignOut() {
 
 .nav-link.active .nav-indicator {
   transform: translateX(-50%) scaleX(1);
+}
+
+.beta-tag {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #F0B429;
+  background: rgba(240, 180, 41, 0.1);
+  border: 1px solid rgba(240, 180, 41, 0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+  line-height: 1.6;
 }
 
 .badge {

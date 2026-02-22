@@ -289,7 +289,7 @@ function fmt(n: number, sign = false) {
                 <path d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2z"/>
               </svg>
             </div>
-            <h3 class="feature-title">Firm Comparison</h3>
+            <h3 class="feature-title">Firm Comparison <span class="lp-beta">BETA</span></h3>
             <p class="feature-body">Side-by-side table of every major prop firm — drawdown rules, fees, profit splits, and trading restrictions.</p>
           </div>
 
@@ -873,6 +873,21 @@ function fmt(n: number, sign = false) {
   font-weight: 700;
   color: #e2e4ee;
   margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lp-beta {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #F0B429;
+  background: rgba(240, 180, 41, 0.1);
+  border: 1px solid rgba(240, 180, 41, 0.25);
+  border-radius: 3px;
+  padding: 2px 6px;
+  line-height: 1.5;
 }
 
 .feature-body {
