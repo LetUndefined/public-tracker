@@ -10,7 +10,7 @@ const route = useRoute()
 const router = useRouter()
 const { unreadCount } = useNotifications()
 const { user, signOut } = useAuth()
-const { isAdmin, checkAdmin } = useAdmin()
+const { isAdmin, checkAdmin, resetAdmin } = useAdmin()
 const { includeMaster } = useMasterToggle()
 const mobileOpen = ref(false)
 
@@ -26,6 +26,7 @@ const navItems = [
 ]
 
 async function handleSignOut() {
+  resetAdmin()
   await signOut()
   router.replace('/login')
 }

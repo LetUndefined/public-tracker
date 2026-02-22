@@ -1,13 +1,20 @@
 import { ref } from 'vue'
 import { supabase } from '@/lib/supabase'
 
-const isAdmin = ref<boolean | null>(null) // null = not checked yet
+const isAdmin = ref<boolean | null>(null) // null = not yet checked
+
+// Reset whenever the auth session changes so stale admin state never persists
+supabase.auth.onAuthStateChange((event) => {
+  if (event === 'SIGNED_OUT' || event === 'USER_UPDATED') {
+    isAdmin.value = null
+  }
+})
 
 export function useAdmin() {
   async function checkAdmin(): Promise<boolean> {
     if (isAdmin.value !== null) return isAdmin.value
     const { data } = await supabase.rpc('is_admin')
-    isAdmin.value = !!data
+    isAdmin.value = data === true
     return isAdmin.value
   }
 
