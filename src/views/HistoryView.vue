@@ -295,7 +295,7 @@ onMounted(async () => {
           started_at: s.started_at ?? '',
           ended_at: s.ended_at ?? '',
           notes: s.notes ?? '',
-        })">LOG →</alert-confirm-btn>
+        })">LOG →</button>
       </div>
     </div>
 
