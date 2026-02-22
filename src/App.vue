@@ -84,10 +84,14 @@ watch(isAuthenticated, async (authed) => {
       <div v-if="!appReady" class="boot-screen">
         <div class="boot-inner">
           <div class="boot-logo">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-              <polygon points="20,4 36,13 36,27 20,36 4,27 4,13" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.3"/>
-              <polygon points="20,10 30,15.5 30,24.5 20,30 10,24.5 10,15.5" stroke="var(--accent)" stroke-width="1.5" fill="none" opacity="0.6"/>
-              <polygon points="20,16 24,18.5 24,21.5 20,24 16,21.5 16,18.5" fill="var(--accent)"/>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10.3" stroke="var(--accent)" stroke-width="1.2"/>
+              <line x1="12" y1="1.7" x2="12" y2="5"   stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="22.3" y1="12" x2="19" y2="12" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="12" y1="22.3" x2="12" y2="19" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="1.7" y1="12" x2="5" y2="12"   stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>
+              <circle cx="12" cy="12" r="4.5" stroke="var(--accent)" stroke-width="0.7" stroke-opacity="0.4"/>
+              <path d="M12 9.8L14.2 12L12 14.2L9.8 12Z" fill="var(--accent)"/>
             </svg>
           </div>
           <div class="boot-label">INITIALIZING</div>

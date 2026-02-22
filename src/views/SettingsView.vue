@@ -137,7 +137,7 @@ async function handleSignOut() {
             <span v-if="saving" class="spinner" />
             {{ saving ? 'Validating…' : 'Save Key' }}
           </button>
-          <button v-if="hasKey" class="ghost-btn" @click="router.replace('/')">
+          <button v-if="hasKey" class="ghost-btn" @click="router.replace('/dashboard')">
             Go to Dashboard
           </button>
         </div>

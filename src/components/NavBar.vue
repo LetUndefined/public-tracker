@@ -18,7 +18,7 @@ const mobileOpen = ref(false)
 checkAdmin()
 
 const navItems = [
-  { path: '/', label: 'Challenges', tour: '' },
+  { path: '/dashboard', label: 'Challenges', tour: '' },
   { path: '/notifications', label: 'Notifications', tour: 'nav-notifications' },
   { path: '/analytics', label: 'Analytics', tour: 'nav-analytics' },
   { path: '/payouts', label: 'Payouts', tour: 'nav-payouts' },
@@ -54,7 +54,7 @@ async function handleSignOut() {
           :key="item.path"
           :to="item.path"
           class="nav-link"
-          :class="{ active: route.path === item.path }"
+          :class="{ active: route.path === item.path || (item.path === '/dashboard' && route.path === '/') }"
           :data-tour="item.tour || undefined"
           @click="mobileOpen = false"
         >
