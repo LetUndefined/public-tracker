@@ -44,7 +44,7 @@ async function handleSignOut() {
             <path d="M12 10L14 12L12 14L10 12Z" fill="currentColor"/>
           </svg>
         </div>
-        <span class="brand-text">SENTI<span class="brand-accent">NEL</span></span>
+        <span class="brand-text">TRADE<span class="brand-accent">CNX</span></span>
       </router-link>
 
       <div class="navbar-links" :class="{ open: mobileOpen }">

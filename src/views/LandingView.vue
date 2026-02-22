@@ -70,7 +70,7 @@ function fmt(n: number, sign = false) {
             <circle cx="12" cy="12" r="4.5" stroke="#F0B429" stroke-width="0.7" stroke-opacity="0.4"/>
             <path d="M12 9.8L14.2 12L12 14.2L9.8 12Z" fill="#F0B429"/>
           </svg>
-          <span class="l-brand-name">SENTINEL</span>
+          <span class="l-brand-name">TRADECNX</span>
         </div>
         <div class="l-nav-right">
           <a href="/login" class="l-nav-link">Sign in</a>
@@ -101,7 +101,7 @@ function fmt(n: number, sign = false) {
 
           <p class="hero-sub">
             If you use MetaCopier to copy trades across your
-            prop firm accounts, Sentinel gives you a single
+            prop firm accounts, TradeCNX gives you a single
             terminal to track live P&amp;L, drawdown, and
             challenge progress — updated every 60 seconds.
           </p>
@@ -143,7 +143,7 @@ function fmt(n: number, sign = false) {
                   <circle cx="12" cy="12" r="10.3" stroke="#F0B429" stroke-width="1.2"/>
                   <path d="M12 9.8L14.2 12L12 14.2L9.8 12Z" fill="#F0B429"/>
                 </svg>
-                <span>SENTINEL</span>
+                <span>TRADECNX</span>
               </div>
               <div class="demo-live">
                 <span class="demo-live-dot" />
@@ -329,7 +329,7 @@ function fmt(n: number, sign = false) {
             <circle cx="12" cy="12" r="10.3" stroke="#F0B429" stroke-width="1.2"/>
             <path d="M12 9.8L14.2 12L12 14.2L9.8 12Z" fill="#F0B429"/>
           </svg>
-          <span class="l-brand-name" style="font-size:11px">SENTINEL</span>
+          <span class="l-brand-name" style="font-size:11px">TRADECNX</span>
         </div>
         <span class="footer-copy">Built for prop firm traders.</span>
       </div>

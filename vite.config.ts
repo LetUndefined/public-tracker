@@ -13,8 +13,8 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       manifest: {
-        name: 'Sentinel',
-        short_name: 'Sentinel',
+        name: 'TradeCNX',
+        short_name: 'TradeCNX',
         description: 'Track your funded prop firm accounts in real time.',
         theme_color: '#06060b',
         background_color: '#06060b',
