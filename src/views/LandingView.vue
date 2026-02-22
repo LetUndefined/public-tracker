@@ -100,9 +100,10 @@ function fmt(n: number, sign = false) {
           </h1>
 
           <p class="hero-sub">
-            Track live P&amp;L, drawdown exposure and
-            challenge progress across all your prop firm
-            accounts — updated every 60 seconds.
+            If you use MetaCopier to copy trades across your
+            prop firm accounts, Sentinel gives you a single
+            terminal to track live P&amp;L, drawdown, and
+            challenge progress — updated every 60 seconds.
           </p>
 
           <div class="hero-actions">
@@ -311,8 +312,8 @@ function fmt(n: number, sign = false) {
       <div class="cta-glow" aria-hidden="true" />
       <div class="cta-inner">
         <div class="section-label">GET STARTED</div>
-        <h2 class="cta-headline">Stop switching between<br />broker dashboards.</h2>
-        <p class="cta-sub">One login. All your prop firm accounts. Real-time.</p>
+        <h2 class="cta-headline">One terminal for<br />all your MetaCopier accounts.</h2>
+        <p class="cta-sub">Already using MetaCopier? Connect your API key and see everything in one place.</p>
         <a href="/login" class="btn-primary btn-lg">
           Create free account
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
