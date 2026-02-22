@@ -36,7 +36,7 @@ async function handleSignOut() {
 <template>
   <nav class="navbar">
     <div class="navbar-inner">
-      <div class="navbar-brand">
+      <router-link to="/" class="navbar-brand">
         <div class="brand-mark">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M12 1L23 12L12 23L1 12Z" stroke="currentColor" stroke-width="1.5"/>
@@ -46,7 +46,7 @@ async function handleSignOut() {
           </svg>
         </div>
         <span class="brand-text">SENTI<span class="brand-accent">NEL</span></span>
-      </div>
+      </router-link>
 
       <div class="navbar-links" :class="{ open: mobileOpen }">
         <router-link
