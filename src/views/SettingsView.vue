@@ -4,12 +4,14 @@ import { useRouter } from 'vue-router'
 import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { useTour } from '@/composables/useTour'
+import { useStartPage } from '@/composables/useStartPage'
 import { supabase } from '@/lib/supabase'
 
 const { user, signOut } = useAuth()
 const router = useRouter()
 const toast = useToast()
 const { startTour } = useTour()
+const { startPage, setStartPage, START_PAGE_OPTIONS } = useStartPage()
 
 const apiKey = ref('')
 const hasKey = ref(false)
@@ -101,6 +103,24 @@ async function handleSignOut() {
               <circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>
             </svg>
             Start Guide
+          </button>
+        </div>
+      </section>
+
+      <!-- Start Page -->
+      <section class="settings-card">
+        <div class="card-label">START PAGE</div>
+        <p class="card-desc">Choose which page opens when you launch the app.</p>
+        <div class="start-page-options">
+          <button
+            v-for="opt in START_PAGE_OPTIONS"
+            :key="opt.path"
+            class="start-page-btn"
+            :class="{ active: startPage === opt.path }"
+            @click="setStartPage(opt.path)"
+          >
+            <span class="sp-dot" />
+            {{ opt.label }}
           </button>
         </div>
       </section>
@@ -372,4 +392,51 @@ async function handleSignOut() {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.start-page-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.start-page-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.start-page-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.start-page-btn.active {
+  border-color: var(--accent);
+  background: rgba(var(--accent-rgb, 99, 102, 241), 0.08);
+  color: var(--accent);
+}
+
+.sp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.start-page-btn.active .sp-dot {
+  background: var(--accent);
+  border-color: var(--accent);
+}
 </style>

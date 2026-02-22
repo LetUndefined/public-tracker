@@ -15,6 +15,7 @@ import PayoutsView from './views/PayoutsView.vue'
 import HistoryView from './views/HistoryView.vue'
 import PropFirmCompareView from './views/PropFirmCompareView.vue'
 import { supabase } from './lib/supabase'
+import { useStartPage } from './composables/useStartPage'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -36,10 +37,16 @@ const router = createRouter({
 // Auth guard
 router.beforeEach(async (to) => {
   if (to.meta.public) {
-    // Redirect authenticated users away from login to dashboard
-    if (to.path === '/login') {
-      const { data } = await supabase.auth.getSession()
-      if (data.session) return '/dashboard'
+    const { data } = await supabase.auth.getSession()
+    if (data.session) {
+      const { startPage } = useStartPage()
+      const pref = startPage.value
+
+      // Redirect authenticated users away from /login to their start page
+      if (to.path === '/login') return pref === '/' ? '/dashboard' : pref
+
+      // On landing page, redirect to their chosen start page (if not landing)
+      if (to.path === '/' && pref !== '/') return pref
     }
     return true
   }
