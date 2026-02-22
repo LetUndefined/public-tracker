@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useNotifications } from '@/composables/useNotifications'
 import { useAuth } from '@/composables/useAuth'
 import { useAdmin } from '@/composables/useAdmin'
 import { useMasterToggle } from '@/composables/useMasterToggle'
 import FeedbackModal from '@/components/FeedbackModal.vue'
+import NotificationBell from '@/components/NotificationBell.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { unreadCount } = useNotifications()
 const { user, signOut } = useAuth()
 const { isAdmin, checkAdmin, resetAdmin } = useAdmin()
 const { includeMaster } = useMasterToggle()
@@ -19,7 +18,7 @@ checkAdmin()
 
 const navItems = [
   { path: '/dashboard', label: 'Challenges', tour: '' },
-  { path: '/notifications', label: 'Notifications', tour: 'nav-notifications' },
+  { path: '/notifications', label: 'Trade Overview', tour: 'nav-notifications' },
   { path: '/analytics', label: 'Analytics', tour: 'nav-analytics' },
   { path: '/payouts', label: 'Payouts', tour: 'nav-payouts' },
   { path: '/history', label: 'History', tour: '' },
@@ -61,12 +60,6 @@ async function handleSignOut() {
           <span class="nav-label">{{ item.label }}</span>
           <span v-if="item.beta" class="beta-tag">BETA</span>
           <span class="nav-indicator" />
-          <span
-            v-if="item.path === '/notifications' && unreadCount > 0"
-            class="badge"
-          >
-            {{ unreadCount > 99 ? '99+' : unreadCount }}
-          </span>
         </router-link>
       </div>
 
@@ -84,6 +77,7 @@ async function handleSignOut() {
           <span class="master-toggle-dot" />
           <span class="master-toggle-label">{{ includeMaster ? 'MASTER ON' : 'MASTER OFF' }}</span>
         </button>
+        <NotificationBell />
         <FeedbackModal />
         <router-link v-if="isAdmin" to="/admin" class="settings-btn admin-link" title="Admin">
           <svg width="15" height="15" viewBox="0 0 15 15" fill="none">

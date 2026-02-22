@@ -1,6 +1,7 @@
 import { ref, computed, watch } from 'vue'
 import { supabase } from '@/lib/supabase'
 import { useMetaCopier } from './useMetaCopier'
+import { useAppNotifications } from './useAppNotifications'
 import type { Challenge, ChallengeRow, MetaCopierAccount, ServerMapping } from '@/types'
 
 const challenges = ref<Challenge[]>([])
@@ -153,6 +154,13 @@ export function useChallenges() {
 
     if (err) throw err
     challenges.value.unshift(data)
+
+    const { push, prefs } = useAppNotifications()
+    if (prefs.value.accountEventsEnabled) {
+      const name = challenge.alias || challenge.login_number || 'New account'
+      push('account_added', 'Account Added', `${name} is now being tracked`)
+    }
+
     return data
   }
 

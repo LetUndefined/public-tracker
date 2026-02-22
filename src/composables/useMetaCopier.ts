@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import type { MetaCopierAccount, MetaCopierTrade } from '@/types'
 import { getBatchLive, getBatchHistory, getAccountTrades } from '@/lib/metacopier'
 import type { OpenPositionInfo } from '@/lib/metacopier'
+import { useAppNotifications } from './useAppNotifications'
 
 const accounts = ref<MetaCopierAccount[]>([])
 const openPositionsMap = ref<Record<string, OpenPositionInfo>>({})
@@ -81,6 +82,11 @@ export function useMetaCopier() {
       tradeCountMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.count]))
       streakMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.streak]))
       dailyPnlMap.value = Object.fromEntries(tradeResults.map(r => [r.id, r.dailyPnl]))
+
+      // Fire app notifications
+      const { checkDailyProfit } = useAppNotifications()
+      const totalDailyPnl = tradeResults.reduce((sum, r) => sum + r.dailyPnl, 0)
+      checkDailyProfit(totalDailyPnl)
     } catch (e: any) {
       console.error('Failed to fetch trade history:', e)
     }

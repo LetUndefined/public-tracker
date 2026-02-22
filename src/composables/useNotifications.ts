@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useMetaCopier } from './useMetaCopier'
 import { useChallenges } from './useChallenges'
 import { usePushNotifications } from './usePushNotifications'
+import { useAppNotifications } from './useAppNotifications'
 import type { MetaCopierTrade } from '@/types'
 
 export interface TradeNotification {
@@ -117,24 +118,31 @@ export function useNotifications() {
     }
   }
 
-  // Watch for accounts hitting their profit target — fires once per account per session
+  // Watch for accounts hitting their profit target or drawdown warnings
   if (!targetWatchSetup) {
     targetWatchSetup = true
     watch(challengeRows, (rows) => {
+      const { push, checkDrawdown } = useAppNotifications()
       for (const row of rows) {
-        if (
-          row.is_master ||
-          row.target_pct <= 0 ||
-          row.progress < row.target_pct ||
-          targetAlertedIds.value.has(row.id)
-        ) continue
+        if (!row.is_master) {
+          // Profit target
+          if (
+            row.target_pct > 0 &&
+            row.progress >= row.target_pct &&
+            !targetAlertedIds.value.has(row.id)
+          ) {
+            targetAlertedIds.value.add(row.id)
+            notify('Profit Target Reached 🎯', `${row.alias} · ${row.progress}% / ${row.target_pct}% target`, `target-${row.id}`)
+            push('profit_target', 'Profit Target Reached 🎯', `${row.alias} · ${row.progress}% of ${row.target_pct}% target`)
+          }
 
-        targetAlertedIds.value.add(row.id)
-        notify(
-          'Profit Target Reached 🎯',
-          `${row.alias} · ${row.progress}% / ${row.target_pct}% target`,
-          `target-${row.id}`,
-        )
+          // Drawdown warning — check % of max DD limit consumed
+          if (row.max_dd_pct && row.max_dd_pct > 0 && row.starting_balance > 0) {
+            const ddUsed = ((row.starting_balance - row.equity) / row.starting_balance) * 100
+            const ddUsedPct = (ddUsed / row.max_dd_pct) * 100
+            checkDrawdown(row.id, row.alias, ddUsedPct)
+          }
+        }
       }
     })
   }

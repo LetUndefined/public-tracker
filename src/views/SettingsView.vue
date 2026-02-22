@@ -5,6 +5,7 @@ import { useAuth } from '@/composables/useAuth'
 import { useToast } from '@/composables/useToast'
 import { useTour } from '@/composables/useTour'
 import { useStartPage } from '@/composables/useStartPage'
+import { useAppNotifications } from '@/composables/useAppNotifications'
 import { supabase } from '@/lib/supabase'
 
 const { user, signOut } = useAuth()
@@ -12,6 +13,7 @@ const router = useRouter()
 const toast = useToast()
 const { startTour } = useTour()
 const { startPage, setStartPage, START_PAGE_OPTIONS } = useStartPage()
+const { prefs: notifPrefs, savePrefs: saveNotifPrefs } = useAppNotifications()
 
 const apiKey = ref('')
 const hasKey = ref(false)
@@ -122,6 +124,84 @@ async function handleSignOut() {
             <span class="sp-dot" />
             {{ opt.label }}
           </button>
+        </div>
+      </section>
+
+      <!-- Notifications -->
+      <section class="settings-card">
+        <div class="card-label">NOTIFICATION ALERTS</div>
+        <p class="card-desc">Configure which events trigger a bell notification.</p>
+
+        <div class="notif-rows">
+          <!-- Account events -->
+          <div class="notif-row">
+            <div class="notif-row-info">
+              <span class="notif-row-title">Account events</span>
+              <span class="notif-row-desc">Notify when an account is added or removed</span>
+            </div>
+            <button
+              class="toggle-btn"
+              :class="{ on: notifPrefs.accountEventsEnabled }"
+              @click="notifPrefs.accountEventsEnabled = !notifPrefs.accountEventsEnabled; saveNotifPrefs()"
+            >
+              <span class="toggle-knob" />
+            </button>
+          </div>
+
+          <!-- Daily profit -->
+          <div class="notif-row" :class="{ dimmed: !notifPrefs.dailyProfitEnabled }">
+            <div class="notif-row-info">
+              <span class="notif-row-title">Daily profit target</span>
+              <span class="notif-row-desc">Alert when total daily P&amp;L hits your target</span>
+            </div>
+            <div class="notif-row-controls">
+              <div class="input-prefix-wrap" v-if="notifPrefs.dailyProfitEnabled">
+                <span class="input-prefix">$</span>
+                <input
+                  type="number"
+                  class="notif-input"
+                  v-model.number="notifPrefs.dailyProfitTarget"
+                  min="1"
+                  @change="saveNotifPrefs()"
+                />
+              </div>
+              <button
+                class="toggle-btn"
+                :class="{ on: notifPrefs.dailyProfitEnabled }"
+                @click="notifPrefs.dailyProfitEnabled = !notifPrefs.dailyProfitEnabled; saveNotifPrefs()"
+              >
+                <span class="toggle-knob" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Drawdown warning -->
+          <div class="notif-row" :class="{ dimmed: !notifPrefs.drawdownWarningEnabled }">
+            <div class="notif-row-info">
+              <span class="notif-row-title">Drawdown warning</span>
+              <span class="notif-row-desc">Alert when DD limit is X% consumed</span>
+            </div>
+            <div class="notif-row-controls">
+              <div class="input-prefix-wrap" v-if="notifPrefs.drawdownWarningEnabled">
+                <input
+                  type="number"
+                  class="notif-input"
+                  v-model.number="notifPrefs.drawdownThreshold"
+                  min="1"
+                  max="100"
+                  @change="saveNotifPrefs()"
+                />
+                <span class="input-suffix">%</span>
+              </div>
+              <button
+                class="toggle-btn"
+                :class="{ on: notifPrefs.drawdownWarningEnabled }"
+                @click="notifPrefs.drawdownWarningEnabled = !notifPrefs.drawdownWarningEnabled; saveNotifPrefs()"
+              >
+                <span class="toggle-knob" />
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -392,6 +472,134 @@ async function handleSignOut() {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Notification rows ── */
+.notif-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.notif-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: opacity 0.15s;
+}
+
+.notif-row:last-child { border-bottom: none; }
+.notif-row.dimmed { opacity: 0.55; }
+
+.notif-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-row-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notif-row-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.notif-row-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Toggle switch */
+.toggle-btn {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.toggle-btn.on {
+  background: var(--accent);
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  display: block;
+}
+
+.toggle-btn.on .toggle-knob {
+  transform: translateX(16px);
+}
+
+/* Inline number input */
+.input-prefix-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+  height: 28px;
+}
+
+.input-prefix, .input-suffix {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 0 6px;
+  background: var(--surface);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--border-subtle);
+}
+
+.input-suffix {
+  border-right: none;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.notif-input {
+  width: 64px;
+  height: 100%;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+  padding: 0 8px;
+  text-align: right;
+}
+
+.notif-input::-webkit-inner-spin-button,
+.notif-input::-webkit-outer-spin-button { opacity: 0; }
 
 .start-page-options {
   display: flex;
