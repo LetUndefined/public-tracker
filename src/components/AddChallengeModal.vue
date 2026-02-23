@@ -4,6 +4,30 @@ import type { MetaCopierAccount } from '@/types'
 import { useChallenges } from '@/composables/useChallenges'
 import { propFirms } from '@/lib/propFirms'
 
+const firmSearch = ref('')
+const firmDropdownOpen = ref(false)
+
+const filteredFirms = computed(() =>
+  firmSearch.value.trim()
+    ? propFirms.filter(f => f.name.toLowerCase().includes(firmSearch.value.toLowerCase()))
+    : propFirms
+)
+
+function selectFirm(name: string) {
+  propFirm.value = name
+  firmSearch.value = name
+  firmDropdownOpen.value = false
+}
+
+function onFirmBlur() {
+  setTimeout(() => { firmDropdownOpen.value = false }, 150)
+}
+
+function onFirmFocus() {
+  firmSearch.value = ''
+  firmDropdownOpen.value = true
+}
+
 const props = defineProps<{
   show: boolean
   unlinkedAccounts: MetaCopierAccount[]
@@ -40,7 +64,7 @@ watch(selectedAccountId, (id) => {
   alias.value = acc.name || acc.login
   startingBalance.value = acc.balance ?? 0
   const guessed = guessProFirm(acc.server)
-  if (guessed !== 'Unknown') propFirm.value = guessed
+  if (guessed !== 'Unknown') { propFirm.value = guessed; firmSearch.value = guessed }
   const firm = propFirms.find(f => f.name === propFirm.value)
   if (firm) {
     const phaseConfig = firm.phases.find(p => p.name === phase.value)
@@ -103,6 +127,7 @@ function resetForm() {
   selectedAccountId.value = ''
   alias.value = ''
   propFirm.value = ''
+  firmSearch.value = ''
   phase.value = 'Phase 1'
   targetPct.value = 8
   owner.value = ''
@@ -168,10 +193,28 @@ function resetForm() {
               </div>
               <div class="form-group" v-if="phase !== 'Master'">
                 <label>Prop Firm</label>
-                <select v-model="propFirm" class="form-input">
-                  <option value="" disabled>Select...</option>
-                  <option v-for="f in propFirms" :key="f.id" :value="f.name">{{ f.name }}</option>
-                </select>
+                <div class="firm-combobox">
+                  <input
+                    v-model="firmSearch"
+                    type="text"
+                    class="form-input"
+                    placeholder="Search firm..."
+                    @focus="onFirmFocus"
+                    @blur="onFirmBlur"
+                    autocomplete="off"
+                  />
+                  <ul v-if="firmDropdownOpen && filteredFirms.length" class="firm-dropdown">
+                    <li
+                      v-for="f in filteredFirms"
+                      :key="f.id"
+                      @mousedown.prevent="selectFirm(f.name)"
+                      :class="{ active: f.name === propFirm }"
+                    >{{ f.name }}</li>
+                  </ul>
+                  <div v-if="firmDropdownOpen && filteredFirms.length === 0" class="firm-dropdown firm-no-results">
+                    No firms found
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -371,6 +414,53 @@ function resetForm() {
   font-size: 11px;
   color: var(--text-tertiary);
   margin: 0;
+}
+
+.firm-combobox {
+  position: relative;
+}
+
+.firm-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 100;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.firm-dropdown li {
+  padding: 7px 12px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.firm-dropdown li:hover,
+.firm-dropdown li.active {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.firm-dropdown li.active {
+  color: var(--accent);
+}
+
+.firm-no-results {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
 }
 
 .form-row {
