@@ -10,21 +10,21 @@ precacheAndRoute(self.__WB_MANIFEST)
 // SPA fallback: any navigation request that isn't a precached file
 // gets served the cached index.html so Vue Router can handle the route
 registerRoute(
-  new NavigationRoute(createHandlerBoundToURL('/public-tracker/index.html'))
+  new NavigationRoute(createHandlerBoundToURL('/index.html'))
 )
 
 // When user taps a notification — focus the app or open it
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
-  const target = '/public-tracker/'
+  const target = '/'
 
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((clients) => {
         for (const client of clients) {
-          if (client.url.includes('/public-tracker/') && 'focus' in client) {
+          if (client.url.includes('tradecnx.com') && 'focus' in client) {
             return (client as WindowClient).focus()
           }
         }

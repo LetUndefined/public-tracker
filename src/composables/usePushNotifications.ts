@@ -25,8 +25,8 @@ export function usePushNotifications() {
       const reg = await navigator.serviceWorker.ready
       await reg.showNotification(title, {
         body,
-        icon: '/challenge-tracker/icon-192.png',
-        badge: '/challenge-tracker/icon-192.png',
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
         tag: tag ?? `trade-${Date.now()}`,
         vibrate: [150, 80, 150],
         requireInteraction: false,
