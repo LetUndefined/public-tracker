@@ -47,6 +47,7 @@ function formatPnl(val: number): string {
 // Row danger coloring based on drawdown relative to max DD limit
 function ddClass(row: ChallengeRow): string {
   if (row.is_master) return ''
+  if (row.state === 'Disconnected') return ''
 
   // Positive progress → color toward target
   if (row.progress > 0 && row.target_pct > 0) {
@@ -171,8 +172,8 @@ function formatLastTrade(ts: string | null): string {
               <span class="chip" :class="row.phase === 'Master' ? 'chip-master' : 'chip-phase'">{{ row.phase }}</span>
             </td>
             <td class="text-secondary">{{ row.platform }}</td>
-            <td class="text-right mono">{{ formatCurrency(row.balance) }}</td>
-            <td class="text-right mono">{{ formatCurrency(row.equity) }}</td>
+            <td class="text-right mono">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.balance) }}</td>
+            <td class="text-right mono">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.equity) }}</td>
             <td class="text-right mono" :class="pnlClass(row.open_pnl)">
               <template v-if="row.open_positions.length > 0">
                 <div v-for="(pos, pi) in row.open_positions" :key="pi" :class="pnlClass(pos.profit)">
@@ -199,7 +200,10 @@ function formatLastTrade(ts: string | null): string {
             </td>
             <td class="text-right mono text-secondary">{{ row.target_pct > 0 ? `${row.target_pct}%` : '—' }}</td>
             <td>
-              <div class="progress-cell">
+              <template v-if="row.state === 'Disconnected'">
+                <span class="text-ghost">—</span>
+              </template>
+              <div v-else class="progress-cell">
                 <div class="progress-bidir">
                   <div class="progress-half loss-half">
                     <div
@@ -235,8 +239,8 @@ function formatLastTrade(ts: string | null): string {
               </div>
             </td>
             <td class="text-right mono">{{ row.trades_count }}</td>
-            <td class="text-right mono" :class="row.daily_pnl > 0 ? 'pnl-positive' : row.daily_pnl < 0 ? 'pnl-negative' : ''">
-              {{ row.daily_pnl !== 0 ? formatPnl(row.daily_pnl) : '—' }}
+            <td class="text-right mono" :class="row.state !== 'Disconnected' && (row.daily_pnl > 0 ? 'pnl-positive' : row.daily_pnl < 0 ? 'pnl-negative' : '')">
+              {{ row.state === 'Disconnected' ? '—' : (row.daily_pnl !== 0 ? formatPnl(row.daily_pnl) : '—') }}
             </td>
             <td class="text-ghost mono-sm">{{ formatLastTrade(row.last_trade) }}</td>
             <td>
@@ -354,11 +358,11 @@ function formatLastTrade(ts: string | null): string {
       <div class="card-grid">
         <div class="card-stat">
           <span class="card-label">Balance</span>
-          <span class="card-value mono">{{ formatCurrency(row.balance) }}</span>
+          <span class="card-value mono">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.balance) }}</span>
         </div>
         <div class="card-stat">
           <span class="card-label">Equity</span>
-          <span class="card-value mono">{{ formatCurrency(row.equity) }}</span>
+          <span class="card-value mono">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.equity) }}</span>
         </div>
         <div class="card-stat">
           <span class="card-label">PNL</span>
@@ -394,32 +398,37 @@ function formatLastTrade(ts: string | null): string {
       </div>
 
       <div class="card-progress">
-        <div class="progress-bidir">
-          <div class="progress-half loss-half">
-            <div
-              v-if="row.progress < 0 && row.target_pct > 0"
-              class="progress-fill-loss"
-              :style="{ width: `${Math.min(Math.abs(row.progress) / row.target_pct * 100, 100)}%` }"
-            />
+        <template v-if="row.state === 'Disconnected'">
+          <span class="text-ghost" style="font-family: var(--font-mono); font-size: 13px;">—</span>
+        </template>
+        <template v-else>
+          <div class="progress-bidir">
+            <div class="progress-half loss-half">
+              <div
+                v-if="row.progress < 0 && row.target_pct > 0"
+                class="progress-fill-loss"
+                :style="{ width: `${Math.min(Math.abs(row.progress) / row.target_pct * 100, 100)}%` }"
+              />
+            </div>
+            <div class="progress-center" />
+            <div class="progress-half profit-half">
+              <template v-if="row.target_pct > 0">
+                <div class="tick" style="left: 25%" />
+                <div class="tick" style="left: 50%" />
+                <div class="tick" style="left: 75%" />
+              </template>
+              <div
+                v-if="row.progress > 0 && row.target_pct > 0"
+                :class="progressFillClass(row)"
+                :style="{ width: `${Math.min(row.progress / row.target_pct * 100, 100)}%` }"
+              />
+            </div>
           </div>
-          <div class="progress-center" />
-          <div class="progress-half profit-half">
-            <template v-if="row.target_pct > 0">
-              <div class="tick" style="left: 25%" />
-              <div class="tick" style="left: 50%" />
-              <div class="tick" style="left: 75%" />
-            </template>
-            <div
-              v-if="row.progress > 0 && row.target_pct > 0"
-              :class="progressFillClass(row)"
-              :style="{ width: `${Math.min(row.progress / row.target_pct * 100, 100)}%` }"
-            />
-          </div>
-        </div>
-        <span class="progress-text" :style="{ color: row.progress >= 0 ? 'var(--green)' : 'var(--red)' }">
-          {{ row.progress }}%
-        </span>
-        <span v-if="row.target_pct > 0 && row.progress >= row.target_pct" class="passed-chip">PASSED</span>
+          <span class="progress-text" :style="{ color: row.progress >= 0 ? 'var(--green)' : 'var(--red)' }">
+            {{ row.progress }}%
+          </span>
+          <span v-if="row.target_pct > 0 && row.progress >= row.target_pct" class="passed-chip">PASSED</span>
+        </template>
       </div>
 
       <!-- Mobile chart dropdown -->
@@ -451,7 +460,7 @@ function formatLastTrade(ts: string | null): string {
         </div>
 
         <!-- Balance -->
-        <div class="cc-balance">{{ formatCurrency(row.balance) }}</div>
+        <div class="cc-balance">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.balance) }}</div>
 
         <!-- PNL -->
         <div class="cc-pnl-row">
@@ -469,31 +478,36 @@ function formatLastTrade(ts: string | null): string {
 
         <!-- Progress bar + % -->
         <div class="cc-progress">
-          <div class="progress-bidir cc-bidir">
-            <div class="progress-half loss-half">
-              <div
-                v-if="row.progress < 0 && row.target_pct > 0"
-                class="progress-fill-loss"
-                :style="{ width: `${Math.min(Math.abs(row.progress) / row.target_pct * 100, 100)}%` }"
-              />
+          <template v-if="row.state === 'Disconnected'">
+            <span class="cc-pct text-ghost">—</span>
+          </template>
+          <template v-else>
+            <div class="progress-bidir cc-bidir">
+              <div class="progress-half loss-half">
+                <div
+                  v-if="row.progress < 0 && row.target_pct > 0"
+                  class="progress-fill-loss"
+                  :style="{ width: `${Math.min(Math.abs(row.progress) / row.target_pct * 100, 100)}%` }"
+                />
+              </div>
+              <div class="progress-center" />
+              <div class="progress-half profit-half">
+                <template v-if="row.target_pct > 0">
+                  <div class="tick" style="left: 25%" />
+                  <div class="tick" style="left: 50%" />
+                  <div class="tick" style="left: 75%" />
+                </template>
+                <div
+                  v-if="row.progress > 0 && row.target_pct > 0"
+                  :class="progressFillClass(row)"
+                  :style="{ width: `${Math.min(row.progress / row.target_pct * 100, 100)}%` }"
+                />
+              </div>
             </div>
-            <div class="progress-center" />
-            <div class="progress-half profit-half">
-              <template v-if="row.target_pct > 0">
-                <div class="tick" style="left: 25%" />
-                <div class="tick" style="left: 50%" />
-                <div class="tick" style="left: 75%" />
-              </template>
-              <div
-                v-if="row.progress > 0 && row.target_pct > 0"
-                :class="progressFillClass(row)"
-                :style="{ width: `${Math.min(row.progress / row.target_pct * 100, 100)}%` }"
-              />
-            </div>
-          </div>
-          <span class="cc-pct" :style="{ color: row.progress >= 0 ? 'var(--green)' : 'var(--red)' }">
-            {{ row.progress }}%
-          </span>
+            <span class="cc-pct" :style="{ color: row.progress >= 0 ? 'var(--green)' : 'var(--red)' }">
+              {{ row.progress }}%
+            </span>
+          </template>
         </div>
       </div>
     </div><!-- /compact-grid -->
