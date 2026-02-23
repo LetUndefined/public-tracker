@@ -1,5 +1,7 @@
 // Shared CORS helper — restricts to known origins only
 const ALLOWED_ORIGINS = [
+  'https://tradecnx.com',
+  'https://www.tradecnx.com',
   'https://letundefined.github.io',
   'http://localhost:5173',
   'http://localhost:5174',
