@@ -134,6 +134,17 @@ function normalizeTradeType(raw: any): string {
   return String(raw ?? '').toLowerCase()
 }
 
+// For CLOSED positions, infer direction from price movement + profit.
+// MetaCopier history returns the closing deal type which is inverted in MT5
+// (closing a BUY uses a SELL deal), so the type field is unreliable.
+function inferClosedSide(openPrice: number, closePrice: number, profit: number): string {
+  if (openPrice > 0 && closePrice > 0 && Math.abs(closePrice - openPrice) > 0.00001) {
+    if (closePrice > openPrice) return profit >= 0 ? 'buy' : 'sell'
+    return profit >= 0 ? 'sell' : 'buy'
+  }
+  return profit >= 0 ? 'buy' : 'sell'
+}
+
 function parseTradeHistory(raw: any[]): MetaCopierTrade[] {
   const positions = (Array.isArray(raw) ? raw : []).filter((p: any) => {
     const type = normalizeTradeType(p.type ?? p.side ?? '')
@@ -141,19 +152,27 @@ function parseTradeHistory(raw: any[]): MetaCopierTrade[] {
     if (!p.symbol && (p.volume === 0 || p.volume === undefined)) return false
     return true
   })
-  return positions.map((p: any) => ({
-    id: p.id || p.positionId || String(p.ticket),
-    symbol: p.symbol || '',
-    type: normalizeTradeType(p.type ?? p.side ?? ''),
-    volume: p.volume ?? p.lots ?? 0,
-    open_price: p.openPrice ?? p.entryPrice ?? 0,
-    close_price: p.closePrice ?? p.exitPrice ?? null,
-    profit: p.profit ?? p.pnl ?? p.netProfit ?? p.pl ?? p.realizedPnl ?? 0,
-    swap: p.swap ?? 0,
-    commission: p.commission ?? 0,
-    open_time: p.openTime ?? p.openedAt ?? '',
-    close_time: p.closeTime ?? p.closedAt ?? null,
-  }))
+  return positions.map((p: any) => {
+    const openPrice = p.openPrice ?? p.entryPrice ?? 0
+    const closePrice = p.closePrice ?? p.exitPrice ?? null
+    const profit = p.profit ?? p.pnl ?? p.netProfit ?? p.pl ?? p.realizedPnl ?? 0
+    const side = closePrice !== null
+      ? inferClosedSide(openPrice, closePrice, profit)
+      : normalizeTradeType(p.type ?? p.side ?? '')
+    return {
+      id: p.id || p.positionId || String(p.ticket),
+      symbol: p.symbol || '',
+      type: side,
+      volume: p.volume ?? p.lots ?? 0,
+      open_price: openPrice,
+      close_price: closePrice,
+      profit,
+      swap: p.swap ?? 0,
+      commission: p.commission ?? 0,
+      open_time: p.openTime ?? p.openedAt ?? '',
+      close_time: p.closeTime ?? p.closedAt ?? null,
+    }
+  })
 }
 
 // ── Batch fetch: all accounts + info + positions in 1 edge call ──────────────

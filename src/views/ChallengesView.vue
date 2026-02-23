@@ -11,7 +11,7 @@ import ChallengeTable from '@/components/ChallengeTable.vue'
 import AddChallengeModal from '@/components/AddChallengeModal.vue'
 import EditChallengeModal from '@/components/EditChallengeModal.vue'
 
-const { startAutoRefresh, stopAutoRefresh, loading: mcLoading, error: mcError } = useMetaCopier()
+const { loading: mcLoading, error: mcError } = useMetaCopier()
 const {
   challengeRows,
   unlinkedAccounts,
@@ -67,13 +67,11 @@ function handleEdit(row: ChallengeRow) {
 }
 
 onMounted(async () => {
-  startAutoRefresh(30_000)
   await fetchChallenges()
   snapshotInterval = setInterval(captureSnapshots, 5 * 60_000)
 })
 
 onUnmounted(() => {
-  stopAutoRefresh()
   if (snapshotInterval) clearInterval(snapshotInterval)
 })
 </script>
