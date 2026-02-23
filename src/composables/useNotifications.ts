@@ -73,7 +73,7 @@ export function useNotifications() {
             // Push alerts — master account only
             if (row?.is_master) {
               const tradeSide = trade.type.toLowerCase()
-              const isBuy = tradeSide.includes('buy') || tradeSide === 'long'
+              const isBuy = tradeSide === '0' || tradeSide.includes('buy') || tradeSide === 'long'
 
               if (isOpen) {
                 // Count how many copier accounts opened the same position
@@ -82,7 +82,7 @@ export function useNotifications() {
                 const matched = copiers.filter(r =>
                   r.open_positions.some(p => {
                     const ps = p.side.toLowerCase()
-                    const pIsBuy = ps.includes('buy') || ps === 'long'
+                    const pIsBuy = ps === '0' || ps.includes('buy') || ps === 'long'
                     return p.symbol.toUpperCase() === trade.symbol.toUpperCase() && pIsBuy === isBuy
                   })
                 ).length

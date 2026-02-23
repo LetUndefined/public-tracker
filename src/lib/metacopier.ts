@@ -98,8 +98,8 @@ function parsePositions(raw: any[]): OpenPositionInfo {
     const sl = p.stopLoss ?? null
     const profit = p.profit ?? p.netProfit ?? p.pnl ?? 0
     const volume = p.volume ?? 0
-    const side = p.orderType ?? p.dealType ?? p.type ?? ''
-    const isBuy = side.toLowerCase().includes('buy') || side.toLowerCase().includes('long')
+    const side = normalizeTradeType(p.orderType ?? p.dealType ?? p.type ?? '')
+    const isBuy = side.includes('buy') || side === 'long'
     const symbol = (p.symbol ?? '').toUpperCase()
 
     let dollarPerPoint: number
@@ -121,15 +121,22 @@ function parsePositions(raw: any[]): OpenPositionInfo {
       const slDist = isBuy ? sl - openPrice : openPrice - sl
       slPnl = Math.round(slDist * dollarPerPoint * 100) / 100
     }
-    return { symbol, side, tp, sl, volume, profit, tpPnl, slPnl }
+    return { symbol, side: isBuy ? 'buy' : 'sell', tp, sl, volume, profit, tpPnl, slPnl }
   })
   const pnl = mapped.reduce((sum, p) => sum + p.profit, 0)
   return { pnl, positions: mapped }
 }
 
+// MT5 returns numeric deal types: 0 = BUY, 1 = SELL
+function normalizeTradeType(raw: any): string {
+  if (raw === 0 || raw === '0') return 'buy'
+  if (raw === 1 || raw === '1') return 'sell'
+  return String(raw ?? '').toLowerCase()
+}
+
 function parseTradeHistory(raw: any[]): MetaCopierTrade[] {
   const positions = (Array.isArray(raw) ? raw : []).filter((p: any) => {
-    const type = String(p.type ?? p.side ?? '').toLowerCase()
+    const type = normalizeTradeType(p.type ?? p.side ?? '')
     if (type === 'balance' || type === 'deposit' || type === 'withdrawal' || type === 'credit') return false
     if (!p.symbol && (p.volume === 0 || p.volume === undefined)) return false
     return true
@@ -137,7 +144,7 @@ function parseTradeHistory(raw: any[]): MetaCopierTrade[] {
   return positions.map((p: any) => ({
     id: p.id || p.positionId || String(p.ticket),
     symbol: p.symbol || '',
-    type: p.type || p.side || '',
+    type: normalizeTradeType(p.type ?? p.side ?? ''),
     volume: p.volume ?? p.lots ?? 0,
     open_price: p.openPrice ?? p.entryPrice ?? 0,
     close_price: p.closePrice ?? p.exitPrice ?? null,

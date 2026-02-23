@@ -89,6 +89,20 @@ function pnlClass(val: number): string {
   return ''
 }
 
+function isBuyPos(side: string): boolean {
+  const s = side.toLowerCase()
+  return s.includes('buy') || s === 'long' || s === '0'
+}
+
+function posDirection(positions: { side: string }[]): string | null {
+  if (positions.length === 0) return null
+  const buys = positions.filter(p => isBuyPos(p.side)).length
+  const sells = positions.length - buys
+  if (buys > 0 && sells === 0) return 'LONG'
+  if (sells > 0 && buys === 0) return 'SHORT'
+  return 'MIXED'
+}
+
 
 function stateClass(state: string): string {
   return state === 'Connected' ? 'state-connected' : 'state-disconnected'
@@ -156,6 +170,11 @@ function formatLastTrade(ts: string | null): string {
                 <div class="account-name-row">
                   <span class="account-alias">{{ row.alias }}</span>
                   <span v-if="row.open_positions.length > 0" class="live-trade-dot" title="Position open" />
+                  <span
+                    v-if="row.open_positions.length > 0"
+                    class="dir-chip"
+                    :class="posDirection(row.open_positions) === 'LONG' ? 'dir-long' : posDirection(row.open_positions) === 'SHORT' ? 'dir-short' : 'dir-mixed'"
+                  >{{ posDirection(row.open_positions) }}</span>
                   <svg
                     class="chevron"
                     :class="{ 'chevron-open': expandedId === row.id }"
@@ -323,6 +342,11 @@ function formatLastTrade(ts: string | null): string {
           <div class="account-name-row">
             <span class="account-alias">{{ row.alias }}</span>
             <span v-if="row.open_positions.length > 0" class="live-trade-dot" title="Position open" />
+            <span
+              v-if="row.open_positions.length > 0"
+              class="dir-chip"
+              :class="posDirection(row.open_positions) === 'LONG' ? 'dir-long' : posDirection(row.open_positions) === 'SHORT' ? 'dir-short' : 'dir-mixed'"
+            >{{ posDirection(row.open_positions) }}</span>
             <svg
               class="chevron"
               :class="{ 'chevron-open': expandedId === row.id }"
@@ -614,6 +638,23 @@ function formatLastTrade(ts: string | null): string {
   color: var(--red);
   font-size: 12px;
 }
+
+/* ─── Direction chip ─── */
+.dir-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  flex-shrink: 0;
+}
+
+.dir-long  { background: rgba(0, 230, 118, 0.12); color: var(--green); border: 1px solid rgba(0, 230, 118, 0.25); }
+.dir-short { background: rgba(255, 71, 87, 0.12);  color: var(--red);   border: 1px solid rgba(255, 71, 87, 0.25); }
+.dir-mixed { background: var(--accent-muted);       color: var(--accent); border: 1px solid rgba(240, 180, 41, 0.25); }
 
 /* ─── Live trade dot ─── */
 .live-trade-dot {
