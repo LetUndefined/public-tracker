@@ -13,6 +13,8 @@ const dailyPnlMap = ref<Record<string, number>>({})
 // Shared trade cache — populated by fetchAccounts, consumed by useNotifications
 // so trades are never fetched twice per cycle
 const tradesMap = ref<Record<string, MetaCopierTrade[]>>({})
+// Last known good balance/equity per account — survives disconnection within the session
+const lastKnownMap = ref<Record<string, { balance: number; equity: number; timestamp: string }>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -52,6 +54,13 @@ export function useMetaCopier() {
       const { accounts: accs, openPositionsMap: posMap } = await getBatchLive()
       accounts.value = accs
       openPositionsMap.value = posMap
+      // Cache last known good values for each connected account
+      const now = new Date().toISOString()
+      for (const acc of accs) {
+        if (acc.connected && acc.balance > 0) {
+          lastKnownMap.value[acc.id] = { balance: acc.balance, equity: acc.equity, timestamp: now }
+        }
+      }
     } catch (e: any) {
       error.value = e.message
       console.error('Failed to fetch MetaCopier accounts:', e)
@@ -131,6 +140,7 @@ export function useMetaCopier() {
     streakMap,
     dailyPnlMap,
     tradesMap,
+    lastKnownMap,
     loading,
     error,
     fetchAccounts,

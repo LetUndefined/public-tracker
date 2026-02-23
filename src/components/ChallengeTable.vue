@@ -108,6 +108,17 @@ function stateClass(state: string): string {
   return state === 'Connected' ? 'state-connected' : 'state-disconnected'
 }
 
+function formatStale(ts: string | null): string {
+  if (!ts) return ''
+  const diffMs = Date.now() - new Date(ts).getTime()
+  const mins = Math.floor(diffMs / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
 function formatLastTrade(ts: string | null): string {
   if (!ts) return '---'
   const d = new Date(ts)
@@ -191,8 +202,8 @@ function formatLastTrade(ts: string | null): string {
               <span class="chip" :class="row.phase === 'Master' ? 'chip-master' : 'chip-phase'">{{ row.phase }}</span>
             </td>
             <td class="text-secondary">{{ row.platform }}</td>
-            <td class="text-right mono">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.balance) }}</td>
-            <td class="text-right mono">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.equity) }}</td>
+            <td class="text-right mono" :class="{ 'stale-val': row.stale_since }">{{ row.balance > 0 ? formatCurrency(row.balance) : '—' }}</td>
+            <td class="text-right mono" :class="{ 'stale-val': row.stale_since }">{{ row.equity > 0 ? formatCurrency(row.equity) : '—' }}</td>
             <td class="text-right mono" :class="pnlClass(row.open_pnl)">
               <template v-if="row.open_positions.length > 0">
                 <div v-for="(pos, pi) in row.open_positions" :key="pi" :class="pnlClass(pos.profit)">
@@ -219,10 +230,10 @@ function formatLastTrade(ts: string | null): string {
             </td>
             <td class="text-right mono text-secondary">{{ row.target_pct > 0 ? `${row.target_pct}%` : '—' }}</td>
             <td>
-              <template v-if="row.state === 'Disconnected'">
+              <template v-if="row.state === 'Disconnected' && !row.stale_since">
                 <span class="text-ghost">—</span>
               </template>
-              <div v-else class="progress-cell">
+              <div v-else class="progress-cell" :class="{ 'stale-val': row.stale_since }">
                 <div class="progress-bidir">
                   <div class="progress-half loss-half">
                     <div
@@ -256,10 +267,13 @@ function formatLastTrade(ts: string | null): string {
                 <span class="state-dot" />
                 <span>{{ row.state }}</span>
               </div>
+              <div v-if="row.stale_since" class="stale-label">
+                cached {{ formatStale(row.stale_since) }}
+              </div>
             </td>
             <td class="text-right mono">{{ row.trades_count }}</td>
-            <td class="text-right mono" :class="row.state !== 'Disconnected' && (row.daily_pnl > 0 ? 'pnl-positive' : row.daily_pnl < 0 ? 'pnl-negative' : '')">
-              {{ row.state === 'Disconnected' ? '—' : (row.daily_pnl !== 0 ? formatPnl(row.daily_pnl) : '—') }}
+            <td class="text-right mono" :class="[row.daily_pnl > 0 ? 'pnl-positive' : row.daily_pnl < 0 ? 'pnl-negative' : '', { 'stale-val': row.stale_since }]">
+              {{ row.daily_pnl !== 0 ? formatPnl(row.daily_pnl) : '—' }}
             </td>
             <td class="text-ghost mono-sm">{{ formatLastTrade(row.last_trade) }}</td>
             <td>
@@ -382,11 +396,11 @@ function formatLastTrade(ts: string | null): string {
       <div class="card-grid">
         <div class="card-stat">
           <span class="card-label">Balance</span>
-          <span class="card-value mono">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.balance) }}</span>
+          <span class="card-value mono" :class="{ 'stale-val': row.stale_since }">{{ row.balance > 0 ? formatCurrency(row.balance) : '—' }}</span>
         </div>
         <div class="card-stat">
           <span class="card-label">Equity</span>
-          <span class="card-value mono">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.equity) }}</span>
+          <span class="card-value mono" :class="{ 'stale-val': row.stale_since }">{{ row.equity > 0 ? formatCurrency(row.equity) : '—' }}</span>
         </div>
         <div class="card-stat">
           <span class="card-label">PNL</span>
@@ -422,7 +436,7 @@ function formatLastTrade(ts: string | null): string {
       </div>
 
       <div class="card-progress">
-        <template v-if="row.state === 'Disconnected'">
+        <template v-if="row.state === 'Disconnected' && !row.stale_since">
           <span class="text-ghost" style="font-family: var(--font-mono); font-size: 13px;">—</span>
         </template>
         <template v-else>
@@ -484,7 +498,7 @@ function formatLastTrade(ts: string | null): string {
         </div>
 
         <!-- Balance -->
-        <div class="cc-balance">{{ row.state === 'Disconnected' ? '—' : formatCurrency(row.balance) }}</div>
+        <div class="cc-balance" :class="{ 'stale-val': row.stale_since }">{{ row.balance > 0 ? formatCurrency(row.balance) : '—' }}</div>
 
         <!-- PNL -->
         <div class="cc-pnl-row">
@@ -863,6 +877,21 @@ function formatLastTrade(ts: string | null): string {
 
 .state-disconnected {
   color: var(--text-tertiary);
+}
+
+/* ─── Stale / cached data ─── */
+.stale-val {
+  opacity: 0.5;
+}
+
+.stale-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+  opacity: 0.7;
 }
 
 /* ─── Empty ─── */

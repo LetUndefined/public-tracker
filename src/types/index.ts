@@ -95,6 +95,7 @@ export interface ChallengeRow {
   open_positions: { symbol: string; side: string; tp: number | null; sl: number | null; volume: number; profit: number; tpPnl: number | null; slPnl: number | null }[]
   is_master: boolean
   state: 'Connected' | 'Disconnected'
+  stale_since: string | null   // timestamp of last known good data, null when connected
   trades_count: number
   last_trade: string | null
   login_number: string

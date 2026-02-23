@@ -41,7 +41,7 @@ function guessPlatform(account: MetaCopierAccount): string {
 }
 
 export function useChallenges() {
-  const { accounts, openPositionsMap, lastTradeMap, tradeCountMap, streakMap, dailyPnlMap } = useMetaCopier()
+  const { accounts, openPositionsMap, lastTradeMap, tradeCountMap, streakMap, dailyPnlMap, lastKnownMap } = useMetaCopier()
   const startingBalances = ref<Record<string, number>>({})
 
   async function fetchChallenges() {
@@ -95,9 +95,14 @@ export function useChallenges() {
   const challengeRows = computed<ChallengeRow[]>(() => {
     return challenges.value.map(ch => {
       const acc = accounts.value.find(a => a.id === ch.metacopier_account_id)
+      const connected = acc?.connected ?? false
+      const cached = lastKnownMap.value[ch.metacopier_account_id]
 
-      const balance = acc?.balance ?? 0
-      const equity = acc?.equity ?? 0
+      // Use live data when connected, fall back to last known cache when disconnected
+      const balance = connected ? (acc?.balance ?? 0) : (cached?.balance ?? 0)
+      const equity  = connected ? (acc?.equity  ?? 0) : (cached?.equity  ?? 0)
+      const staleSince = !connected ? (cached?.timestamp ?? null) : null
+
       // Priority: explicit starting_balance from DB > earliest snapshot > current balance
       const starting = ch.starting_balance ?? startingBalances.value[ch.id] ?? balance
       const safeDivisor = starting > 0 ? starting : 1
@@ -120,7 +125,8 @@ export function useChallenges() {
         open_pnl: openPositionsMap.value[ch.metacopier_account_id]?.pnl ?? 0,
         open_positions: openPositionsMap.value[ch.metacopier_account_id]?.positions ?? [],
         is_master: isMaster,
-        state: acc?.connected ? 'Connected' : 'Disconnected',
+        state: connected ? 'Connected' : 'Disconnected',
+        stale_since: staleSince,
         trades_count: tradeCountMap.value[ch.metacopier_account_id] ?? acc?.trades_count ?? 0,
         last_trade: lastTradeMap.value[ch.metacopier_account_id] || null,
         login_number: ch.login_number,
