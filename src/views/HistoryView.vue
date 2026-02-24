@@ -250,6 +250,32 @@ function isFunded(entry: HistoryEntry): boolean {
   return entry.phase.toLowerCase().includes('fund')
 }
 
+function phaseClass(phase: string): string {
+  const p = phase.toLowerCase()
+  if (p.includes('fund')) return 'phase-funded'
+  if (/2/.test(p)) return 'phase-p2'
+  if (/1/.test(p)) return 'phase-p1'
+  return 'phase-other'
+}
+
+const phaseFilter = ref('all')
+
+const filteredEntries = computed(() => {
+  switch (phaseFilter.value) {
+    case 'p1':     return entries.value.filter(e => /1/.test(e.phase.toLowerCase()) && !isFunded(e))
+    case 'p2':     return entries.value.filter(e => /2/.test(e.phase.toLowerCase()) && !isFunded(e))
+    case 'funded': return entries.value.filter(e => isFunded(e))
+    case 'blown':  return entries.value.filter(e => e.outcome === 'Failed')
+    default:       return entries.value
+  }
+})
+
+function getCost(entry: HistoryEntry): string {
+  if (!entry.challenge_id) return '—'
+  const row = challengeRows.value.find(r => r.id === entry.challenge_id)
+  return row?.cost ? fmt(row.cost) : '—'
+}
+
 const payoutsByChallenge = computed(() => {
   const map: Record<string, number> = {}
   for (const p of payouts.value) {
@@ -364,6 +390,15 @@ onMounted(async () => {
 
     </div>
 
+    <!-- ── Phase filter ── -->
+    <div class="phase-filters">
+      <button class="pf-btn" :class="{ 'pf-active': phaseFilter === 'all' }"     @click="phaseFilter = 'all'">All</button>
+      <button class="pf-btn pf-p1" :class="{ 'pf-active': phaseFilter === 'p1' }"     @click="phaseFilter = 'p1'">Phase 1</button>
+      <button class="pf-btn pf-p2" :class="{ 'pf-active': phaseFilter === 'p2' }"     @click="phaseFilter = 'p2'">Phase 2</button>
+      <button class="pf-btn pf-funded" :class="{ 'pf-active': phaseFilter === 'funded' }" @click="phaseFilter = 'funded'">Funded</button>
+      <button class="pf-btn pf-blown" :class="{ 'pf-active': phaseFilter === 'blown' }"  @click="phaseFilter = 'blown'">Blown</button>
+    </div>
+
     <!-- ── Ledger ── -->
     <div class="ledger-wrap">
       <div v-if="loading" class="ledger-empty">
@@ -387,16 +422,16 @@ onMounted(async () => {
             <th class="lh-r">Payouts</th>
             <th>Period</th>
             <th class="lh-r lh-days">Days</th>
-            <th class="lh-notes">Notes</th>
+            <th class="lh-r lh-notes">Cost</th>
             <th class="lh-act" />
           </tr>
         </thead>
         <tbody>
           <tr
-            v-for="(entry, i) in entries"
+            v-for="(entry, i) in filteredEntries"
             :key="entry.id"
             class="ledger-row"
-            :class="'row-' + entry.outcome.toLowerCase()"
+            :class="[phaseClass(entry.phase), 'row-' + entry.outcome.toLowerCase()]"
             :style="{ animationDelay: `${i * 30}ms` }"
           >
             <!-- Left status bar -->
@@ -408,7 +443,9 @@ onMounted(async () => {
             </td>
             <td class="lc-alias">{{ entry.alias }}</td>
             <td class="lc-firm">{{ entry.prop_firm }}</td>
-            <td class="lc-phase">{{ entry.phase }}</td>
+            <td class="lc-phase">
+              <span class="phase-tag" :class="'phase-tag-' + phaseClass(entry.phase).replace('phase-', '')">{{ entry.phase }}</span>
+            </td>
             <td class="lc-r lc-money">{{ entry.starting_balance > 0 ? fmt(entry.starting_balance) : '—' }}</td>
             <td class="lc-r lc-payout">
               <span v-if="isFunded(entry) && entry.challenge_id && payoutsByChallenge[entry.challenge_id]" class="lc-extracted">
@@ -423,7 +460,7 @@ onMounted(async () => {
               <span v-else class="period-end">{{ fmtDate(entry.ended_at) }}</span>
             </td>
             <td class="lc-r lc-days">{{ entry.duration_days ?? '—' }}</td>
-            <td class="lc-notes">{{ entry.notes ?? '' }}</td>
+            <td class="lc-r lc-notes">{{ getCost(entry) }}</td>
             <td class="lc-act" :class="entry.outcome === 'Active' ? 'lc-act--active' : ''">
               <template v-if="entry.outcome === 'Active'">
                 <template v-if="isFunded(entry)">
@@ -865,6 +902,36 @@ onMounted(async () => {
 
 .alert-confirm-btn:hover { opacity: 0.85; }
 
+/* ── Phase filter bar ───────────────────────────────────────── */
+.phase-filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.pf-btn {
+  padding: 5px 13px;
+  border-radius: 5px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.pf-btn:hover { border-color: var(--text-muted); color: var(--text-secondary); }
+
+.pf-btn.pf-active { color: var(--text-primary); border-color: var(--border); background: var(--bg-elevated); }
+
+.pf-p1.pf-active     { background: rgba(99,179,237,0.1);  border-color: rgba(99,179,237,0.35);  color: #63b3ed; }
+.pf-p2.pf-active     { background: rgba(183,148,244,0.1); border-color: rgba(183,148,244,0.35); color: #b794f4; }
+.pf-funded.pf-active { background: rgba(240,180,41,0.1);  border-color: rgba(240,180,41,0.35);  color: var(--accent); }
+.pf-blown.pf-active  { background: rgba(255,71,87,0.1);   border-color: rgba(255,71,87,0.3);    color: var(--red); }
+
 /* ── Ledger table ────────────────────────────────────────────── */
 .ledger-wrap {
   background: var(--surface);
@@ -955,15 +1022,21 @@ onMounted(async () => {
 
 .ledger-row:last-child { border-bottom: none; }
 
-.row-passed  { border-left-color: rgba(0, 230, 118, 0.5); }
-.row-failed  { border-left-color: rgba(255, 71, 87, 0.5); }
-.row-abandoned { border-left-color: rgba(255, 159, 67, 0.5); }
-.row-active  { border-left-color: rgba(240, 180, 41, 0.6); background: rgba(240, 180, 41, 0.025); }
+/* Phase-based left border */
+.phase-p1     { border-left-color: rgba(99, 179, 237, 0.6); }
+.phase-p2     { border-left-color: rgba(183, 148, 244, 0.6); }
+.phase-funded { border-left-color: rgba(240, 180, 41, 0.6); }
+.phase-other  { border-left-color: rgba(255,255,255,0.1); }
 
-.row-passed:hover  { background: rgba(0, 230, 118, 0.04); border-left-color: var(--green); }
-.row-failed:hover  { background: rgba(255, 71, 87, 0.04); border-left-color: var(--red); }
-.row-abandoned:hover { background: rgba(255, 159, 67, 0.04); border-left-color: rgba(255,159,67,0.9); }
-.row-active:hover  { background: rgba(240, 180, 41, 0.05); border-left-color: var(--accent); }
+/* Outcome background tints (subtle) */
+.row-active   { background: rgba(240, 180, 41, 0.018); }
+.row-failed   { background: rgba(255, 71, 87, 0.018); }
+
+/* Hover — brighten the phase border */
+.phase-p1:hover     { background: rgba(99, 179, 237, 0.04); border-left-color: #63b3ed; }
+.phase-p2:hover     { background: rgba(183, 148, 244, 0.04); border-left-color: #b794f4; }
+.phase-funded:hover { background: rgba(240, 180, 41, 0.05); border-left-color: var(--accent); }
+.phase-other:hover  { background: rgba(255,255,255,0.02); }
 
 /* Cells */
 .ledger-row td {
@@ -1035,11 +1108,30 @@ onMounted(async () => {
   color: var(--text-primary);
 }
 
-.lc-firm, .lc-phase {
+.lc-firm {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
   color: var(--text-muted);
 }
+
+.lc-phase { white-space: nowrap; }
+
+.phase-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.phase-tag-p1     { background: rgba(99,179,237,0.1);  border: 1px solid rgba(99,179,237,0.25);  color: #63b3ed; }
+.phase-tag-p2     { background: rgba(183,148,244,0.1); border: 1px solid rgba(183,148,244,0.25); color: #b794f4; }
+.phase-tag-funded { background: rgba(240,180,41,0.1);  border: 1px solid rgba(240,180,41,0.25);  color: var(--accent); }
+.phase-tag-other  { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); }
 
 .lc-r { text-align: right; }
 
