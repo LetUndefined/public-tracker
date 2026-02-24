@@ -257,6 +257,18 @@ onMounted(async () => {
             <div class="stat-val" :class="stats.unreadFb > 0 ? 'stat-accent' : ''">{{ stats.unreadFb }}</div>
             <div class="stat-key">UNREAD FEEDBACK</div>
           </div>
+          <div class="stat-cell stat-cell--divider">
+            <div class="stat-val stat-accent">{{ visitors.todaySessions }}</div>
+            <div class="stat-key">UNIQUE TODAY</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val">{{ visitors.weekSessions }}</div>
+            <div class="stat-key">UNIQUE 7D</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-val">{{ visitors.totalViews.toLocaleString() }}</div>
+            <div class="stat-key">TOTAL VIEWS</div>
+          </div>
         </div>
 
         <!-- ── Controls ── -->
@@ -522,6 +534,10 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.stat-cell--divider {
+  border-left: 1px solid var(--border);
 }
 
 .stat-val {
