@@ -383,10 +383,8 @@ onMounted(async () => {
             <th>Account</th>
             <th>Firm</th>
             <th>Phase</th>
-            <th class="lh-r">Starting</th>
-            <th class="lh-r">Final</th>
-            <th class="lh-r">P&L</th>
-            <th class="lh-r">Payout</th>
+            <th class="lh-r">Account Size</th>
+            <th class="lh-r">Payouts</th>
             <th>Period</th>
             <th class="lh-r lh-days">Days</th>
             <th class="lh-notes">Notes</th>
@@ -412,13 +410,11 @@ onMounted(async () => {
             <td class="lc-firm">{{ entry.prop_firm }}</td>
             <td class="lc-phase">{{ entry.phase }}</td>
             <td class="lc-r lc-money">{{ entry.starting_balance > 0 ? fmt(entry.starting_balance) : '—' }}</td>
-            <td class="lc-r lc-money">{{ isFunded(entry) && entry.final_balance > 0 ? fmt(entry.final_balance) : '—' }}</td>
-            <td class="lc-r lc-pnl" :class="isFunded(entry) ? pnlClass(entry) : ''">{{ isFunded(entry) ? (pnlPct(entry) || '—') : '—' }}</td>
             <td class="lc-r lc-payout">
-              <template v-if="isFunded(entry) && entry.challenge_id && payoutsByChallenge[entry.challenge_id]">
-                <span class="lc-extracted">{{ fmt(payoutsByChallenge[entry.challenge_id]) }}</span>
-              </template>
-              <template v-else>—</template>
+              <span v-if="isFunded(entry) && entry.challenge_id && payoutsByChallenge[entry.challenge_id]" class="lc-extracted">
+                {{ fmt(payoutsByChallenge[entry.challenge_id]) }}
+              </span>
+              <span v-else>—</span>
             </td>
             <td class="lc-period">
               <span class="period-start">{{ fmtDate(entry.started_at) }}</span>
