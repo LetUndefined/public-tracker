@@ -107,10 +107,22 @@ function formatTime(ts: string): string {
   const diffMs = now.getTime() - d.getTime()
   const diffMin = Math.floor(diffMs / 60_000)
   if (diffMin < 1) return 'now'
-  if (diffMin < 60) return `${diffMin}m`
+  if (diffMin < 60) return `${diffMin}m ago`
   const diffHr = Math.floor(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h`
+  if (diffHr < 24) return `${diffHr}h ago`
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+function formatDateTime(ts: string | null): string {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  const now = new Date()
+  const sameDay = d.toDateString() === now.toDateString()
+  if (sameDay) {
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function formatPnl(v: number): string {
@@ -382,52 +394,61 @@ function isBuy(side: string): boolean {
             :class="{ 'row-open': n.is_open, 'row-buy': isBuy(n.side), 'row-sell': !isBuy(n.side) }"
             :style="{ 'animation-delay': `${Math.min(i, 15) * 25}ms` }"
           >
-            <!-- Direction -->
+            <!-- Direction icon -->
             <div class="trade-dir" :class="isBuy(n.side) ? 'dir-buy' : 'dir-sell'">
-              <svg v-if="isBuy(n.side)" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <svg v-if="isBuy(n.side)" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                 <path d="M12 19V5M5 12l7-7 7 7"/>
               </svg>
-              <svg v-else width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+              <svg v-else width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                 <path d="M12 5v14M5 12l7 7 7-7"/>
               </svg>
             </div>
 
-            <!-- Symbol + side label -->
-            <div class="trade-symbol-col">
-              <div class="trade-sym">{{ n.symbol }}</div>
-              <div class="trade-side" :class="isBuy(n.side) ? 'side-buy' : 'side-sell'">
-                {{ isBuy(n.side) ? 'BUY' : 'SELL' }}
+            <!-- Main 2-row content -->
+            <div class="trade-main">
+              <!-- Top row: symbol · side · lots · prices -->
+              <div class="trade-top">
+                <span class="trade-sym">{{ n.symbol }}</span>
+                <span class="trade-side-badge" :class="isBuy(n.side) ? 'side-buy' : 'side-sell'">
+                  {{ isBuy(n.side) ? 'BUY' : 'SELL' }}
+                </span>
+                <span class="trade-vol">{{ n.volume }}L</span>
+                <span class="trade-prices">
+                  {{ n.open_price }}<template v-if="n.close_price !== null"><span class="arrow"> → </span>{{ n.close_price }}</template>
+                </span>
+              </div>
+              <!-- Bottom row: account tag + timestamps -->
+              <div class="trade-sub">
+                <span v-if="selectedId === null" class="trade-acct-tag">{{ n.account_alias }}</span>
+                <span class="trade-times">
+                  <span class="time-label">opened</span>
+                  <span class="time-val">{{ formatDateTime(n.open_time) }}</span>
+                  <template v-if="!n.is_open && n.close_time">
+                    <span class="time-sep">·</span>
+                    <span class="time-label">closed</span>
+                    <span class="time-val">{{ formatDateTime(n.close_time) }}</span>
+                  </template>
+                  <template v-else-if="n.is_open">
+                    <span class="time-sep">·</span>
+                    <span class="live-dot-inline" />
+                    <span class="time-live">LIVE</span>
+                  </template>
+                </span>
               </div>
             </div>
 
-            <!-- Volume + prices -->
-            <div class="trade-detail">
-              <span class="trade-vol">{{ n.volume }}L</span>
-              <span class="trade-prices">
-                {{ n.open_price }}
-                <template v-if="n.close_price !== null">
-                  <span class="arrow">→</span>{{ n.close_price }}
-                </template>
-              </span>
-              <span v-if="selectedId === null" class="trade-acct-tag">{{ n.account_alias }}</span>
-            </div>
-
-            <!-- P&L / open chip -->
-            <div class="trade-pnl-col">
+            <!-- Right: P&L + relative age -->
+            <div class="trade-right">
               <span
                 v-if="!n.is_open && n.profit !== null"
                 class="trade-pnl"
                 :class="n.profit >= 0 ? 'pnl-pos' : 'pnl-neg'"
-              >
-                {{ formatPnl(n.profit) }}
-              </span>
+              >{{ formatPnl(n.profit) }}</span>
               <span v-else-if="n.is_open" class="open-chip">
                 <span class="pip-sm" />LIVE
               </span>
+              <span class="trade-age">{{ formatTime(n.timestamp) }}</span>
             </div>
-
-            <!-- Time -->
-            <div class="trade-time">{{ formatTime(n.timestamp) }}</div>
           </div>
         </div>
 
@@ -1053,10 +1074,10 @@ function isBuy(side: string): boolean {
 
 .trade-row {
   display: grid;
-  grid-template-columns: 28px 80px 1fr auto 44px;
+  grid-template-columns: 30px 1fr auto;
   align-items: center;
-  gap: 12px;
-  padding: 10px 18px;
+  gap: 14px;
+  padding: 12px 18px;
   border-bottom: 1px solid var(--border-subtle);
   border-left: 2px solid transparent;
   animation: fadeInUp 0.25s var(--ease-out) both;
@@ -1070,8 +1091,8 @@ function isBuy(side: string): boolean {
 
 /* Direction icon */
 .trade-dir {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1082,11 +1103,20 @@ function isBuy(side: string): boolean {
 .dir-buy  { background: var(--green-muted); color: var(--green); }
 .dir-sell { background: var(--red-muted);   color: var(--red); }
 
-/* Symbol column */
-.trade-symbol-col {
+/* Main 2-row content */
+.trade-main {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* Top row */
+.trade-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .trade-sym {
@@ -1094,30 +1124,27 @@ function isBuy(side: string): boolean {
   font-size: 13px;
   font-weight: 700;
   color: var(--text-primary);
+  flex-shrink: 0;
 }
 
-.trade-side {
+.trade-side-badge {
   font-family: var(--font-mono);
   font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 1px 5px;
+  border-radius: 2px;
+  flex-shrink: 0;
 }
 
-.side-buy  { color: var(--green); }
-.side-sell { color: var(--red); }
-
-/* Detail column */
-.trade-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
+.side-buy  { background: var(--green-muted); color: var(--green); }
+.side-sell { background: var(--red-muted);   color: var(--red); }
 
 .trade-vol {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .trade-prices {
@@ -1129,22 +1156,79 @@ function isBuy(side: string): boolean {
   text-overflow: ellipsis;
 }
 
-.arrow {
-  color: var(--text-ghost);
-  margin: 0 3px;
-}
+.arrow { color: var(--text-ghost); }
 
-/* P&L column */
-.trade-pnl-col {
+/* Sub row (timestamps) */
+.trade-sub {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trade-times {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
+.time-label {
+  color: var(--text-ghost);
+  font-size: 9px;
+  letter-spacing: 0.05em;
+}
+
+.time-val {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.time-sep {
+  color: var(--border);
+  margin: 0 1px;
+}
+
+.live-dot-inline {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-live 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.time-live {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+/* Right column: P&L + age */
+.trade-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
 }
 
 .trade-pnl {
   font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.trade-age {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-ghost);
   white-space: nowrap;
 }
 
@@ -1162,15 +1246,6 @@ function isBuy(side: string): boolean {
   border: 1px solid rgba(240, 180, 41, 0.2);
   color: var(--accent);
   animation: pulse-live 2s ease-in-out infinite;
-}
-
-/* Time */
-.trade-time {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--text-ghost);
-  text-align: right;
-  white-space: nowrap;
 }
 
 /* Shared */
@@ -1253,17 +1328,9 @@ function isBuy(side: string): boolean {
   }
 
   .trade-row {
-    grid-template-columns: 28px 70px 1fr auto 36px;
-    gap: 8px;
+    grid-template-columns: 28px 1fr auto;
+    gap: 10px;
     padding: 10px 14px;
-  }
-
-  .trade-detail {
-    display: none;
-  }
-
-  .trade-row {
-    grid-template-columns: 28px 80px 1fr 36px;
   }
 }
 </style>
