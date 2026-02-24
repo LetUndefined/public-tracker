@@ -36,7 +36,7 @@ const form = ref({
   alias: '',
   prop_firm: '',
   phase: '',
-  outcome: 'Passed' as 'Passed' | 'Failed' | 'Abandoned' | 'Active',
+  outcome: 'Active' as 'Passed' | 'Failed' | 'Abandoned' | 'Active',
   starting_balance: '',
   final_balance: '',
   payout_received: '',
@@ -128,7 +128,7 @@ function openAdd(prefill?: Partial<typeof form.value>) {
     alias: prefill?.alias ?? '',
     prop_firm: prefill?.prop_firm ?? '',
     phase: prefill?.phase ?? '',
-    outcome: (prefill?.outcome as any) ?? 'Passed',
+    outcome: (prefill?.outcome as any) ?? 'Active',
     starting_balance: prefill?.starting_balance ?? '',
     final_balance: prefill?.final_balance ?? '',
     payout_received: prefill?.payout_received ?? '',
@@ -317,7 +317,7 @@ onMounted(async () => {
       </div>
       <button class="hv-log-btn" @click="openAdd()">
         <span class="log-btn-plus">+</span>
-        <span>Log Outcome</span>
+        <span>Add Entry</span>
       </button>
     </div>
 
@@ -504,7 +504,7 @@ onMounted(async () => {
           <div class="modal-top">
             <div class="modal-top-left">
               <div class="modal-eyebrow">{{ editingEntry ? 'EDIT RECORD' : 'NEW RECORD' }}</div>
-              <div class="modal-top-title">{{ editingEntry ? 'Edit Entry' : 'Log Outcome' }}</div>
+              <div class="modal-top-title">{{ editingEntry ? 'Edit Entry' : 'Add Challenge' }}</div>
             </div>
             <button class="modal-x" @click="showModal = false">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -556,19 +556,21 @@ onMounted(async () => {
               </div>
             </div>
 
-            <div class="field-grid-3">
+            <div :class="form.outcome === 'Active' ? 'field-grid-1' : 'field-grid-3'">
               <div class="field-row">
                 <label class="field-lbl">Starting Balance</label>
                 <input v-model="form.starting_balance" type="number" class="field-ctrl" placeholder="10000" />
               </div>
-              <div class="field-row">
-                <label class="field-lbl">Final Balance</label>
-                <input v-model="form.final_balance" type="number" class="field-ctrl" placeholder="11000" />
-              </div>
-              <div class="field-row">
-                <label class="field-lbl">Payout Received</label>
-                <input v-model="form.payout_received" type="number" class="field-ctrl" placeholder="0" />
-              </div>
+              <template v-if="form.outcome !== 'Active'">
+                <div class="field-row">
+                  <label class="field-lbl">Final Balance</label>
+                  <input v-model="form.final_balance" type="number" class="field-ctrl" placeholder="11000" />
+                </div>
+                <div class="field-row">
+                  <label class="field-lbl">Payout Received</label>
+                  <input v-model="form.payout_received" type="number" class="field-ctrl" placeholder="0" />
+                </div>
+              </template>
             </div>
 
             <div class="field-grid-2">
@@ -576,7 +578,7 @@ onMounted(async () => {
                 <label class="field-lbl">Started</label>
                 <input v-model="form.started_at" type="date" class="field-ctrl" />
               </div>
-              <div class="field-row">
+              <div v-if="form.outcome !== 'Active'" class="field-row">
                 <label class="field-lbl">Ended</label>
                 <input v-model="form.ended_at" type="date" class="field-ctrl" />
               </div>
@@ -591,7 +593,7 @@ onMounted(async () => {
           <div class="modal-foot">
             <button class="mf-cancel" @click="showModal = false">Cancel</button>
             <button class="mf-save" @click="save">
-              {{ editingEntry ? 'Save Changes' : 'Log Entry' }}
+              {{ editingEntry ? 'Save Changes' : 'Add to History' }}
             </button>
           </div>
         </div>
@@ -1291,6 +1293,7 @@ onMounted(async () => {
   gap: 6px;
 }
 
+.field-grid-1 { display: grid; grid-template-columns: 1fr; gap: 12px; }
 .field-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
 
