@@ -34,6 +34,26 @@ const router = createRouter({
   ],
 })
 
+// ── Page view tracking (anonymous + authenticated) ────────────────
+function getSessionId(): string {
+  const key = 'pv_sid'
+  let sid = sessionStorage.getItem(key)
+  if (!sid) { sid = crypto.randomUUID(); sessionStorage.setItem(key, sid) }
+  return sid
+}
+
+router.afterEach(async (to) => {
+  if (to.path === '/admin') return
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    await supabase.from('page_views').insert({
+      page: to.path,
+      user_id: session?.user?.id ?? null,
+      session_id: getSessionId(),
+    })
+  } catch { /* silently ignore */ }
+})
+
 // Auth guard
 router.beforeEach(async (to) => {
   if (to.meta.public) {

@@ -34,6 +34,15 @@ interface SystemStats {
   histExtracted: number
 }
 
+interface VisitorStats {
+  todayViews: number
+  todaySessions: number
+  weekViews: number
+  weekSessions: number
+  totalViews: number
+  topPages: { page: string; views: number }[]
+}
+
 interface FeedbackRow {
   id: string
   user_id: string | null
@@ -47,6 +56,7 @@ interface FeedbackRow {
 const users    = ref<UserRow[]>([])
 const system   = ref<SystemStats>({ histPassed: 0, histFailed: 0, histExtracted: 0 })
 const feedback = ref<FeedbackRow[]>([])
+const visitors = ref<VisitorStats>({ todayViews: 0, todaySessions: 0, weekViews: 0, weekSessions: 0, totalViews: 0, topPages: [] })
 const loading  = ref(true)
 const error    = ref('')
 const search   = ref('')
@@ -138,12 +148,42 @@ async function copyEmail(e: Event, email: string) {
   await navigator.clipboard.writeText(email)
 }
 
+async function fetchVisitorStats() {
+  const today   = new Date(); today.setHours(0, 0, 0, 0)
+  const weekAgo = new Date(Date.now() - 7 * 86400000)
+
+  const [{ data: recent }, { count: total }] = await Promise.all([
+    supabase.from('page_views').select('page, session_id, created_at').gte('created_at', weekAgo.toISOString()),
+    supabase.from('page_views').select('*', { count: 'exact', head: true }),
+  ])
+
+  const rows        = recent ?? []
+  const todayRows   = rows.filter(r => new Date(r.created_at) >= today)
+  const pageCounts  = rows.reduce((acc: Record<string, number>, r) => {
+    acc[r.page] = (acc[r.page] ?? 0) + 1; return acc
+  }, {})
+  const topPages = Object.entries(pageCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([page, views]) => ({ page, views }))
+
+  visitors.value = {
+    todayViews:    todayRows.length,
+    todaySessions: new Set(todayRows.map(r => r.session_id)).size,
+    weekViews:     rows.length,
+    weekSessions:  new Set(rows.map(r => r.session_id)).size,
+    totalViews:    total ?? 0,
+    topPages,
+  }
+}
+
 onMounted(async () => {
   try {
     const data = await fetchAdminData()
     users.value    = (data.users    ?? []).map((u: any) => ({ ...u, expanded: false }))
     system.value   = data.system   ?? { histPassed: 0, histFailed: 0, histExtracted: 0 }
     feedback.value = data.feedback ?? []
+    await fetchVisitorStats()
   } catch (e: any) {
     error.value = e.message
     if (e.message === 'Not authorized') router.replace('/')
@@ -350,6 +390,45 @@ onMounted(async () => {
                 <span v-if="!fb.read" class="inbox-dot" />
               </div>
               <div class="inbox-msg">{{ fb.message }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Visitor traffic ── -->
+        <div class="system-section">
+          <div class="section-label">VISITOR TRAFFIC</div>
+          <div class="sys-cards">
+            <div class="sys-card">
+              <div class="sys-val sys-accent">{{ visitors.todayViews }}</div>
+              <div class="sys-key">VIEWS TODAY</div>
+            </div>
+            <div class="sys-card">
+              <div class="sys-val sys-accent">{{ visitors.todaySessions }}</div>
+              <div class="sys-key">VISITORS TODAY</div>
+            </div>
+            <div class="sys-card">
+              <div class="sys-val">{{ visitors.weekViews }}</div>
+              <div class="sys-key">VIEWS 7D</div>
+            </div>
+            <div class="sys-card">
+              <div class="sys-val">{{ visitors.weekSessions }}</div>
+              <div class="sys-key">VISITORS 7D</div>
+            </div>
+            <div class="sys-card">
+              <div class="sys-val">{{ visitors.totalViews.toLocaleString() }}</div>
+              <div class="sys-key">TOTAL VIEWS</div>
+            </div>
+          </div>
+          <div class="top-pages" v-if="visitors.topPages.length">
+            <div class="tp-label">TOP PAGES · LAST 7 DAYS</div>
+            <div class="tp-rows">
+              <div v-for="p in visitors.topPages" :key="p.page" class="tp-row">
+                <span class="tp-page">{{ p.page || '/' }}</span>
+                <div class="tp-bar-wrap">
+                  <div class="tp-bar" :style="{ width: `${Math.round(p.views / visitors.topPages[0].views * 100)}%` }" />
+                </div>
+                <span class="tp-count">{{ p.views }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -927,6 +1006,63 @@ onMounted(async () => {
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* ── Top pages ── */
+.top-pages {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.tp-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.tp-rows { display: flex; flex-direction: column; gap: 6px; }
+
+.tp-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 36px;
+  align-items: center;
+  gap: 10px;
+}
+
+.tp-page {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tp-bar-wrap {
+  height: 4px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.tp-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.6s cubic-bezier(0.23,1,0.32,1);
+  opacity: 0.7;
+}
+
+.tp-count {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: right;
 }
 
 /* ── Responsive ── */
