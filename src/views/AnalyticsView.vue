@@ -240,6 +240,17 @@ function fmtTime(dt: string | null): string {
   return new Date(dt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+function fmtDuration(open: string, close: string): string {
+  const ms = new Date(close).getTime() - new Date(open).getTime()
+  const mins = Math.floor(ms / 60_000)
+  if (mins < 1) return '<1m'
+  if (mins < 60) return `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  const rem = mins % 60
+  if (hrs < 24) return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`
+  return `${Math.floor(hrs / 24)}d ${hrs % 24}h`
+}
+
 function fmtPrice(p: number | null): string {
   if (p === null) return '—'
   return p.toFixed(5).replace(/\.?0+$/, '')
@@ -777,15 +788,6 @@ function wrColor(wr: number, has: boolean): string {
             </button>
           </div>
 
-          <!-- Column headers -->
-          <div class="modal-col-header">
-            <span>SYMBOL</span>
-            <span>TYPE</span>
-            <span>LOTS</span>
-            <span class="col-prices">OPEN → CLOSE</span>
-            <span class="col-pnl">P&amp;L</span>
-          </div>
-
           <!-- Trade list -->
           <div class="modal-trades">
             <div v-if="selectedDayTrades.length === 0" class="modal-empty">
@@ -797,22 +799,35 @@ function wrColor(wr: number, has: boolean): string {
               class="trade-card"
               :class="tradeDirection(t.type) === 'BUY' ? 'trade-buy' : 'trade-sell'"
             >
-              <div class="tc-symbol">{{ t.symbol }}</div>
-              <div
-                class="tc-type"
-                :class="tradeDirection(t.type) === 'BUY' ? 'type-buy' : 'type-sell'"
-              >{{ tradeDirection(t.type) }}</div>
-              <div class="tc-volume">{{ t.volume }}</div>
-              <div class="tc-prices col-prices">
+              <!-- Row 1: direction + symbol + volume / P&L -->
+              <div class="tc-row1">
+                <div class="tc-left">
+                  <span class="tc-dir" :class="tradeDirection(t.type) === 'BUY' ? 'type-buy' : 'type-sell'">
+                    {{ tradeDirection(t.type) === 'BUY' ? '▲' : '▼' }} {{ tradeDirection(t.type) }}
+                  </span>
+                  <span class="tc-symbol">{{ t.symbol }}</span>
+                  <span class="tc-volume">{{ t.volume }} lots</span>
+                </div>
+                <div class="tc-pnl" :style="{ color: pnlColor(t.profit ?? 0) }">
+                  {{ fmtPnl(t.profit ?? 0) }}
+                </div>
+              </div>
+              <!-- Row 2: prices -->
+              <div class="tc-row2">
+                <span class="tc-label">open</span>
                 <span class="tc-price">{{ fmtPrice(t.open_price) }}</span>
                 <span class="tc-arrow">→</span>
+                <span class="tc-label">close</span>
                 <span class="tc-price">{{ fmtPrice(t.close_price) }}</span>
               </div>
-              <div class="tc-pnl col-pnl" :style="{ color: pnlColor(t.profit ?? 0) }">
-                {{ fmtPnl(t.profit ?? 0) }}
-              </div>
-              <div class="tc-meta">
-                <span class="tc-time">{{ fmtTime(t.close_time) }}</span>
+              <!-- Row 3: times + account + fees -->
+              <div class="tc-row3">
+                <span class="tc-time-chip">{{ fmtTime(t.open_time) }}</span>
+                <span class="tc-arrow-sm">→</span>
+                <span class="tc-time-chip">{{ fmtTime(t.close_time) }}</span>
+                <span class="tc-duration" v-if="t.open_time && t.close_time">
+                  ({{ fmtDuration(t.open_time, t.close_time) }})
+                </span>
                 <span class="tc-sep">·</span>
                 <span class="tc-acct">{{ t.alias }}</span>
                 <template v-if="(t.swap ?? 0) !== 0 || (t.commission ?? 0) !== 0">
@@ -1622,25 +1637,6 @@ function wrColor(wr: number, has: boolean): string {
   color: var(--red);
 }
 
-/* Column headers */
-.modal-col-header {
-  display: grid;
-  grid-template-columns: 1fr 52px 52px 1fr 100px;
-  gap: 8px;
-  padding: 8px 22px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-.modal-col-header span {
-  font-family: var(--font-mono);
-  font-size: 8px;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-}
-.modal-col-header .col-pnl { text-align: right; }
-
 /* Trade list */
 .modal-trades {
   overflow-y: auto;
@@ -1656,88 +1652,122 @@ function wrColor(wr: number, has: boolean): string {
 }
 
 .trade-card {
-  display: grid;
-  grid-template-columns: 1fr 52px 52px 1fr 100px;
-  grid-template-rows: auto auto;
-  gap: 4px 8px;
-  align-items: center;
-  padding: 12px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 22px;
   border-bottom: 1px solid var(--border-subtle);
   transition: background 0.12s;
 }
 .trade-card:last-child { border-bottom: none; }
-.trade-card:hover { background: rgba(255, 255, 255, 0.025); }
+.trade-card:hover { background: rgba(255, 255, 255, 0.02); }
 
-.trade-buy  { border-left: 2px solid rgba(0, 212, 170, 0.35); }
-.trade-sell { border-left: 2px solid rgba(255, 71, 87, 0.35); }
+.trade-buy  { border-left: 3px solid rgba(0, 212, 170, 0.4); }
+.trade-sell { border-left: 3px solid rgba(255, 71, 87, 0.4); }
+
+/* Row 1 */
+.tc-row1 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tc-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tc-dir {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 3px 7px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.type-buy  { background: rgba(0, 212, 170, 0.12); color: var(--green); border: 1px solid rgba(0, 212, 170, 0.2); }
+.type-sell { background: rgba(255, 71, 87, 0.12);  color: var(--red);   border: 1px solid rgba(255, 71, 87, 0.2); }
 
 .tc-symbol {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   color: var(--text-primary);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.03em;
 }
-
-.tc-type {
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  padding: 3px 6px;
-  border-radius: 3px;
-  text-align: center;
-  align-self: center;
-}
-.type-buy  { background: rgba(0, 212, 170, 0.15); color: var(--green); }
-.type-sell { background: rgba(255, 71, 87,  0.15); color: var(--red); }
 
 .tc-volume {
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-secondary);
-  align-self: center;
+  color: var(--text-tertiary);
 }
 
-.tc-prices {
+.tc-pnl {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  flex-shrink: 0;
+}
+
+/* Row 2 */
+.tc-row2 {
   display: flex;
   align-items: center;
-  gap: 5px;
-  align-self: center;
+  gap: 6px;
+}
+
+.tc-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
 }
 
 .tc-price {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-secondary);
 }
 
 .tc-arrow {
   font-size: 10px;
   color: var(--text-tertiary);
+  margin: 0 2px;
 }
 
-.tc-pnl {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  text-align: right;
-  align-self: center;
-}
-
-/* meta row spans full width */
-.tc-meta {
-  grid-column: 1 / -1;
+/* Row 3 */
+.tc-row3 {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 2px;
+  flex-wrap: wrap;
 }
 
-.tc-time {
+.tc-time-chip {
   font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+.tc-arrow-sm {
   font-size: 9px;
+  color: var(--text-tertiary);
+}
+
+.tc-duration {
+  font-family: var(--font-mono);
+  font-size: 10px;
   color: var(--text-tertiary);
 }
 
@@ -1748,14 +1778,14 @@ function wrColor(wr: number, has: boolean): string {
 
 .tc-acct {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-tertiary);
   letter-spacing: 0.04em;
 }
 
 .tc-fees {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 10px;
   color: var(--text-tertiary);
 }
 
@@ -1828,17 +1858,11 @@ function wrColor(wr: number, has: boolean): string {
     max-height: 88vh;
     border-radius: var(--radius-md);
   }
-  .modal-col-header,
-  .trade-card {
-    grid-template-columns: 1fr 44px 44px 1fr 80px;
-  }
   .modal-header { padding: 16px 16px 14px; }
-  .modal-trades { padding: 0; }
-  .trade-card { padding: 10px 16px; }
-  .modal-col-header { padding: 6px 16px; }
+  .trade-card { padding: 12px 16px; }
   .modal-pnl { font-size: 22px; }
-  .tc-symbol { font-size: 12px; }
-  .tc-pnl { font-size: 12px; }
-  .tc-price { font-size: 10px; }
+  .tc-symbol { font-size: 13px; }
+  .tc-pnl { font-size: 15px; }
+  .tc-price { font-size: 11px; }
 }
 </style>

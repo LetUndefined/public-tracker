@@ -92,7 +92,7 @@ export interface ChallengeRow {
   target_pct: number
   progress: number       // (profit / target) * 100
   open_pnl: number       // live PNL from open positions
-  open_positions: { symbol: string; side: string; tp: number | null; sl: number | null; volume: number; profit: number; tpPnl: number | null; slPnl: number | null }[]
+  open_positions: { symbol: string; side: string; open_price: number; open_time: string | null; tp: number | null; sl: number | null; volume: number; profit: number; swap: number; commission: number; tpPnl: number | null; slPnl: number | null }[]
   is_master: boolean
   state: 'Connected' | 'Disconnected'
   stale_since: string | null   // timestamp of last known good data, null when connected

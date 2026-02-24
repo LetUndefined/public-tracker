@@ -77,10 +77,14 @@ function parseAccount(acc: RawAccount, info: RawAccountInfo | null): MetaCopierA
 export interface OpenPosition {
   symbol: string
   side: string
+  open_price: number
+  open_time: string | null
   tp: number | null
   sl: number | null
   volume: number
   profit: number
+  swap: number
+  commission: number
   tpPnl: number | null
   slPnl: number | null
 }
@@ -121,7 +125,10 @@ function parsePositions(raw: any[]): OpenPositionInfo {
       const slDist = isBuy ? sl - openPrice : openPrice - sl
       slPnl = Math.round(slDist * dollarPerPoint * 100) / 100
     }
-    return { symbol, side: isBuy ? 'buy' : 'sell', tp, sl, volume, profit, tpPnl, slPnl }
+    const swap = p.swap ?? 0
+    const commission = p.commission ?? 0
+    const open_time = p.openTime ?? p.openedAt ?? null
+    return { symbol, side: isBuy ? 'buy' : 'sell', open_price: openPrice, open_time, tp, sl, volume, profit, swap, commission, tpPnl, slPnl }
   })
   const pnl = mapped.reduce((sum, p) => sum + p.profit, 0)
   return { pnl, positions: mapped }
