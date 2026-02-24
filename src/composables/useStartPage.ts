@@ -13,7 +13,7 @@ export const START_PAGE_OPTIONS: StartPageOption[] = [
   { path: '/notifications', label: 'Notifications'     },
   { path: '/analytics',     label: 'Analytics'         },
   { path: '/payouts',       label: 'Payouts'           },
-  { path: '/history',       label: 'History'           },
+  { path: '/history',       label: 'Track Record'      },
   { path: '/compare',       label: 'Compare Prop Firms'},
 ]
 

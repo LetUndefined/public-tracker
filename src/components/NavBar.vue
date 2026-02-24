@@ -21,7 +21,7 @@ const navItems = [
   { path: '/notifications', label: 'Trade Overview', tour: 'nav-notifications' },
   { path: '/analytics', label: 'Analytics', tour: 'nav-analytics' },
   { path: '/payouts', label: 'Payouts', tour: 'nav-payouts' },
-  { path: '/history', label: 'History', tour: '' },
+  { path: '/history', label: 'Track Record', tour: '' },
   { path: '/compare', label: 'Compare Prop Firms', tour: 'nav-compare', beta: true },
 ]
 

@@ -313,7 +313,7 @@ onMounted(async () => {
     <div class="hv-topbar">
       <div class="hv-identity">
         <div class="hv-eyebrow">CHALLENGE LEDGER</div>
-        <h1 class="hv-title">History</h1>
+        <h1 class="hv-title">Track Record</h1>
       </div>
       <button class="hv-log-btn" @click="openAdd()">
         <span class="log-btn-plus">+</span>
@@ -477,19 +477,17 @@ onMounted(async () => {
                 <button class="qsa-btn qsa-fail" @click="quickSetOutcome(entry, 'Failed')" title="Mark Failed">FAIL</button>
                 <button class="qsa-btn qsa-abnd" @click="quickSetOutcome(entry, 'Abandoned')" title="Mark Abandoned">ABND</button>
               </template>
-              <template v-else>
-                <button class="act-edit" @click="openEdit(entry)" title="Edit">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                  </svg>
-                </button>
-                <button class="act-del" @click="deleteEntry(entry.id)" title="Delete">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <path d="M18 6 6 18M6 6l12 12"/>
-                  </svg>
-                </button>
-              </template>
+              <button class="act-edit" @click="openEdit(entry)" title="Edit">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+              </button>
+              <button class="act-del" @click="deleteEntry(entry.id)" title="Delete">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
             </td>
           </tr>
         </tbody>
