@@ -19,20 +19,6 @@ type MobileView = 'full' | 'compact'
 const mobileView = ref<MobileView>('full')
 const expandedId = ref<string | null>(null)
 const tradeDetailId = ref<string | null>(null)
-const mockPositions = [
-  {
-    symbol: 'EURUSD', side: 'buy', open_price: 1.08420, profit: 91.00,
-    volume: 0.10, tp: 1.08700, sl: 1.08200,
-    tpPnl: 280, slPnl: -220, swap: -1.20, commission: -3.50,
-    open_time: new Date(Date.now() - 2 * 60 * 60 * 1000 - 34 * 60 * 1000).toISOString(),
-  },
-  {
-    symbol: 'GBPJPY', side: 'sell', open_price: 191.250, profit: -42.50,
-    volume: 0.05, tp: 190.500, sl: 192.000,
-    tpPnl: 375, slPnl: -375, swap: 0, commission: -2.00,
-    open_time: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
-  },
-]
 
 function formatDuration(ts: string | null): string {
   if (!ts) return '—'
@@ -396,10 +382,9 @@ function formatLastTrade(ts: string | null): string {
           <tr v-if="expandedId === row.id" class="chart-row">
             <td colspan="16" class="chart-td">
               <!-- Live positions strip -->
-              <div class="trade-detail-strip">
-                <div class="td-test-label" v-if="row.open_positions.length === 0">MOCK DATA</div>
+              <div v-if="row.open_positions.length > 0" class="trade-detail-strip">
                 <div
-                  v-for="(pos, pi) in (row.open_positions.length > 0 ? row.open_positions : mockPositions)"
+                  v-for="(pos, pi) in row.open_positions"
                   :key="pi"
                   class="td-card"
                 >
