@@ -323,9 +323,9 @@ function formatLastTrade(ts: string | null): string {
                 <div class="progress-bidir">
                   <div class="progress-half loss-half">
                     <div
-                      v-if="row.progress < 0 && row.target_pct > 0"
+                      v-if="row.progress < 0 && (row.max_dd_pct ?? 0) > 0"
                       class="progress-fill-loss"
-                      :style="{ width: `${Math.min(Math.abs(row.progress) / row.target_pct * 100, 100)}%` }"
+                      :style="{ width: `${Math.min(Math.abs(row.progress) / row.max_dd_pct! * 100, 100)}%` }"
                     />
                   </div>
                   <div class="progress-center" />
@@ -632,9 +632,9 @@ function formatLastTrade(ts: string | null): string {
           <div class="progress-bidir">
             <div class="progress-half loss-half">
               <div
-                v-if="row.progress < 0 && row.target_pct > 0"
+                v-if="row.progress < 0 && (row.max_dd_pct ?? 0) > 0"
                 class="progress-fill-loss"
-                :style="{ width: `${Math.min(Math.abs(row.progress) / row.target_pct * 100, 100)}%` }"
+                :style="{ width: `${Math.min(Math.abs(row.progress) / row.max_dd_pct! * 100, 100)}%` }"
               />
             </div>
             <div class="progress-center" />
