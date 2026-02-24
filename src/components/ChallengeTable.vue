@@ -18,6 +18,104 @@ const { fetchSnapshots } = useChallenges()
 type MobileView = 'full' | 'compact'
 const mobileView = ref<MobileView>('full')
 const expandedId = ref<string | null>(null)
+const tradeDetailId = ref<string | null>(null)
+const mockPositions = [
+  {
+    symbol: 'EURUSD', side: 'buy', open_price: 1.08420, profit: 91.00,
+    volume: 0.10, tp: 1.08700, sl: 1.08200,
+    tpPnl: 280, slPnl: -220, swap: -1.20, commission: -3.50,
+    open_time: new Date(Date.now() - 2 * 60 * 60 * 1000 - 34 * 60 * 1000).toISOString(),
+  },
+  {
+    symbol: 'GBPJPY', side: 'sell', open_price: 191.250, profit: -42.50,
+    volume: 0.05, tp: 190.500, sl: 192.000,
+    tpPnl: 375, slPnl: -375, swap: 0, commission: -2.00,
+    open_time: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
+  },
+]
+
+function formatDuration(ts: string | null): string {
+  if (!ts) return '—'
+  const ms = Date.now() - new Date(ts).getTime()
+  const mins = Math.floor(ms / 60_000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  const rem = mins % 60
+  if (hrs < 24) return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`
+  return `${Math.floor(hrs / 24)}d ${hrs % 24}h`
+}
+
+function formatOpenTime(ts: string | null): string {
+  if (!ts) return '—'
+  const d = new Date(ts)
+  const now = new Date()
+  const sameDay = d.toDateString() === now.toDateString()
+  const time = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+  if (sameDay) return time
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + time
+}
+
+function calcRR(pos: { tp: number | null; sl: number | null; open_price: number; symbol: string }): string | null {
+  if (!pos.tp || !pos.sl || !pos.open_price) return null
+  const pipSz = getPipSize(pos.symbol)
+  const toTP = Math.abs(pos.tp - pos.open_price) / pipSz
+  const toSL = Math.abs(pos.sl - pos.open_price) / pipSz
+  if (toSL === 0) return null
+  return (toTP / toSL).toFixed(2)
+}
+
+function riskPct(slPnl: number | null, balance: number): string | null {
+  if (slPnl === null || balance <= 0) return null
+  return ((Math.abs(slPnl) / balance) * 100).toFixed(1)
+}
+
+function toggleTradeDetail(e: Event, rowId: string) {
+  e.stopPropagation()
+  tradeDetailId.value = tradeDetailId.value === rowId ? null : rowId
+}
+
+function getDollarPerPoint(symbol: string, volume: number): number {
+  const s = symbol.toUpperCase()
+  if (s.includes('XAU') || s.includes('GOLD'))   return volume * 100
+  if (s.includes('XAG') || s.includes('SILVER')) return volume * 5000
+  if (s.includes('BTC') || s.includes('ETH'))    return volume * 1
+  if (s.includes('US30') || s.includes('DJ') || s.includes('NAS') || s.includes('US100') || s.includes('SPX') || s.includes('US500')) return volume * 1
+  return volume * 100000
+}
+
+function getPipSize(symbol: string): number {
+  const s = symbol.toUpperCase()
+  if (s.includes('JPY'))                         return 0.01
+  if (s.includes('XAU') || s.includes('GOLD'))   return 0.1
+  if (s.includes('XAG') || s.includes('SILVER')) return 0.001
+  if (s.includes('BTC') || s.includes('ETH') || s.includes('US30') || s.includes('DJ') || s.includes('NAS') || s.includes('US100') || s.includes('SPX') || s.includes('US500')) return 1
+  return 0.0001
+}
+
+function estimateCurrentPrice(pos: { open_price: number; profit: number; side: string; symbol: string; volume: number }): number | null {
+  if (!pos.open_price || !pos.volume) return null
+  const dpp = getDollarPerPoint(pos.symbol, pos.volume)
+  if (dpp === 0) return null
+  const isBuy = isBuyPos(pos.side)
+  return isBuy
+    ? pos.open_price + pos.profit / dpp
+    : pos.open_price - pos.profit / dpp
+}
+
+function pipsDistance(from: number, to: number, symbol: string): string {
+  const pips = Math.abs(from - to) / getPipSize(symbol)
+  return pips.toFixed(1)
+}
+
+function priceDecimals(symbol: string): number {
+  const s = symbol.toUpperCase()
+  if (s.includes('JPY')) return 3
+  if (s.includes('XAU') || s.includes('GOLD')) return 2
+  if (s.includes('BTC')) return 1
+  if (s.includes('US30') || s.includes('NAS') || s.includes('SPX')) return 1
+  return 5
+}
 const snapshotsCache = ref<Record<string, { timestamp: string; equity: number }[]>>({})
 const snapshotsLoading = ref<Record<string, boolean>>({})
 
@@ -184,7 +282,9 @@ function formatLastTrade(ts: string | null): string {
                   <span
                     v-if="row.open_positions.length > 0"
                     class="dir-chip"
-                    :class="posDirection(row.open_positions) === 'LONG' ? 'dir-long' : posDirection(row.open_positions) === 'SHORT' ? 'dir-short' : 'dir-mixed'"
+                    :class="[posDirection(row.open_positions) === 'LONG' ? 'dir-long' : posDirection(row.open_positions) === 'SHORT' ? 'dir-short' : 'dir-mixed', { 'dir-chip-active': tradeDetailId === row.id }]"
+                    :title="tradeDetailId === row.id ? 'Hide trade detail' : 'Show trade detail'"
+                    @click.stop="toggleTradeDetail($event, row.id)"
                   >{{ posDirection(row.open_positions) }}</span>
                   <svg
                     class="chevron"
@@ -292,9 +392,89 @@ function formatLastTrade(ts: string | null): string {
               </div>
             </td>
           </tr>
-          <!-- Expandable chart row -->
+          <!-- Expandable chart row (with live positions above chart) -->
           <tr v-if="expandedId === row.id" class="chart-row">
             <td colspan="16" class="chart-td">
+              <!-- Live positions strip -->
+              <div class="trade-detail-strip">
+                <div class="td-test-label" v-if="row.open_positions.length === 0">MOCK DATA</div>
+                <div
+                  v-for="(pos, pi) in (row.open_positions.length > 0 ? row.open_positions : mockPositions)"
+                  :key="pi"
+                  class="td-card"
+                >
+                  <!-- Row 1: symbol, direction, size, time -->
+                  <div class="td-row1">
+                    <span class="td-symbol">{{ pos.symbol }}</span>
+                    <span class="td-dir" :class="isBuyPos(pos.side) ? 'td-buy' : 'td-sell'">{{ isBuyPos(pos.side) ? 'BUY' : 'SELL' }}</span>
+                    <span class="td-vol">{{ pos.volume }} lots</span>
+                    <span class="td-sep">·</span>
+                    <span class="td-label">opened</span>
+                    <span class="td-price">{{ formatOpenTime(pos.open_time) }}</span>
+                    <span class="td-ghost">({{ formatDuration(pos.open_time) }} ago)</span>
+                    <template v-if="pos.swap || pos.commission">
+                      <span class="td-sep">·</span>
+                      <span class="td-label">swap</span>
+                      <span :class="(pos.swap ?? 0) >= 0 ? 'td-pos' : 'td-neg'">{{ formatPnl(pos.swap ?? 0) }}</span>
+                      <span class="td-label">comm</span>
+                      <span class="td-neg">{{ formatPnl(pos.commission ?? 0) }}</span>
+                    </template>
+                  </div>
+                  <!-- Row 2: entry → current, pips moved, current PnL -->
+                  <div class="td-row2">
+                    <template v-if="pos.open_price && estimateCurrentPrice(pos) !== null">
+                      <span class="td-label">entry</span>
+                      <span class="td-price">{{ pos.open_price.toFixed(priceDecimals(pos.symbol)) }}</span>
+                      <span class="td-arrow">→</span>
+                      <span class="td-label">now</span>
+                      <span class="td-price">{{ estimateCurrentPrice(pos)!.toFixed(priceDecimals(pos.symbol)) }}</span>
+                      <span class="td-pips" :class="pos.profit >= 0 ? 'td-pos' : 'td-neg'">
+                        ({{ pos.profit >= 0 ? '+' : '' }}{{ pipsDistance(pos.open_price, estimateCurrentPrice(pos)!, pos.symbol) }}p)
+                      </span>
+                      <span class="td-sep">·</span>
+                      <span class="td-label">P&L</span>
+                      <span :class="pos.profit >= 0 ? 'td-pos' : 'td-neg'" style="font-weight:700">{{ formatPnl(pos.profit) }}</span>
+                      <template v-if="(pos.swap ?? 0) !== 0 || (pos.commission ?? 0) !== 0">
+                        <span class="td-sep">·</span>
+                        <span class="td-label">net</span>
+                        <span :class="(pos.profit + (pos.swap ?? 0) + (pos.commission ?? 0)) >= 0 ? 'td-pos' : 'td-neg'" style="font-weight:700">
+                          {{ formatPnl(pos.profit + (pos.swap ?? 0) + (pos.commission ?? 0)) }}
+                        </span>
+                      </template>
+                    </template>
+                  </div>
+                  <!-- Row 3: TP, SL, R:R, risk% -->
+                  <div class="td-row3">
+                    <span class="td-label">TP</span>
+                    <template v-if="pos.tp !== null && estimateCurrentPrice(pos) !== null">
+                      <span class="td-price">{{ pos.tp.toFixed(priceDecimals(pos.symbol)) }}</span>
+                      <span class="td-pos">({{ pos.tpPnl !== null ? formatPnl(pos.tpPnl) : '' }}</span>
+                      <span class="td-pos td-small"> +{{ pipsDistance(estimateCurrentPrice(pos)!, pos.tp, pos.symbol) }}p)</span>
+                    </template>
+                    <span v-else class="td-ghost">—</span>
+                    <span class="td-sep">·</span>
+                    <span class="td-label">SL</span>
+                    <template v-if="pos.sl !== null && estimateCurrentPrice(pos) !== null">
+                      <span class="td-price">{{ pos.sl.toFixed(priceDecimals(pos.symbol)) }}</span>
+                      <span class="td-neg">({{ pos.slPnl !== null ? formatPnl(-Math.abs(pos.slPnl)) : '' }}</span>
+                      <span class="td-neg td-small"> -{{ pipsDistance(estimateCurrentPrice(pos)!, pos.sl, pos.symbol) }}p)</span>
+                    </template>
+                    <span v-else class="td-ghost">—</span>
+                    <template v-if="calcRR(pos)">
+                      <span class="td-sep">·</span>
+                      <span class="td-label">R:R</span>
+                      <span class="td-price">{{ calcRR(pos) }}</span>
+                    </template>
+                    <template v-if="riskPct(pos.slPnl, row.balance)">
+                      <span class="td-sep">·</span>
+                      <span class="td-label">risk</span>
+                      <span :class="parseFloat(riskPct(pos.slPnl, row.balance)!) > 2 ? 'td-neg' : 'td-price'">
+                        {{ riskPct(pos.slPnl, row.balance) }}%
+                      </span>
+                    </template>
+                  </div>
+                </div>
+              </div>
               <ProgressChart
                 :snapshots="snapshotsCache[row.id] ?? []"
                 :starting-balance="row.starting_balance"
@@ -359,7 +539,8 @@ function formatLastTrade(ts: string | null): string {
             <span
               v-if="row.open_positions.length > 0"
               class="dir-chip"
-              :class="posDirection(row.open_positions) === 'LONG' ? 'dir-long' : posDirection(row.open_positions) === 'SHORT' ? 'dir-short' : 'dir-mixed'"
+              :class="[posDirection(row.open_positions) === 'LONG' ? 'dir-long' : posDirection(row.open_positions) === 'SHORT' ? 'dir-short' : 'dir-mixed', { 'dir-chip-active': tradeDetailId === row.id }]"
+              @click.stop="toggleTradeDetail($event, row.id)"
             >{{ posDirection(row.open_positions) }}</span>
             <svg
               class="chevron"
@@ -432,6 +613,29 @@ function formatLastTrade(ts: string | null): string {
           <span class="card-pos-pnl" :class="pnlClass(pos.profit)">{{ formatPnl(pos.profit) }}</span>
           <span class="tp-value">TP {{ pos.tpPnl !== null ? formatPnl(pos.tpPnl) : '---' }}</span>
           <span class="sl-value">SL {{ pos.slPnl !== null ? formatPnl(pos.slPnl) : '---' }}</span>
+        </div>
+        <!-- Mobile trade detail -->
+        <div v-if="tradeDetailId === row.id" class="mobile-trade-detail">
+          <div v-for="(pos, pi) in row.open_positions" :key="pi" class="trade-detail-line">
+            <span class="td-symbol">{{ pos.symbol }}</span>
+            <span class="td-dir" :class="isBuyPos(pos.side) ? 'td-buy' : 'td-sell'">{{ isBuyPos(pos.side) ? 'BUY' : 'SELL' }}</span>
+            <template v-if="pos.open_price && estimateCurrentPrice(pos) !== null">
+              <span class="td-label">In</span>
+              <span class="td-price">{{ pos.open_price.toFixed(priceDecimals(pos.symbol)) }}</span>
+              <span class="td-arrow">→</span>
+              <span class="td-pips" :class="pos.profit >= 0 ? 'td-pos' : 'td-neg'">
+                {{ pos.profit >= 0 ? '+' : '-' }}{{ pipsDistance(pos.open_price, estimateCurrentPrice(pos)!, pos.symbol) }}p
+              </span>
+            </template>
+            <span class="td-sep">|</span>
+            <span class="td-label">TP</span>
+            <span v-if="pos.tp !== null && estimateCurrentPrice(pos) !== null" class="td-pos">+{{ pipsDistance(estimateCurrentPrice(pos)!, pos.tp, pos.symbol) }}p</span>
+            <span v-else class="td-ghost">—</span>
+            <span class="td-sep">|</span>
+            <span class="td-label">SL</span>
+            <span v-if="pos.sl !== null && estimateCurrentPrice(pos) !== null" class="td-neg">-{{ pipsDistance(estimateCurrentPrice(pos)!, pos.sl, pos.symbol) }}p</span>
+            <span v-else class="td-ghost">—</span>
+          </div>
         </div>
       </div>
 
@@ -987,6 +1191,115 @@ function formatLastTrade(ts: string | null): string {
   background: rgba(24, 220, 255, 0.08);
   color: var(--cyan);
   border: 1px solid rgba(24, 220, 255, 0.14);
+}
+
+/* ─── Trade detail strip ─── */
+.trade-detail-row td {
+  padding: 0 !important;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.trade-detail-td {
+  background: rgba(6, 6, 11, 0.7);
+  border-left: 2px solid var(--accent);
+  animation: slideDown 0.2s var(--ease-out);
+}
+
+.trade-detail-strip {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.td-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.td-row1, .td-row2, .td-row3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.td-row2 { opacity: 0.9; }
+.td-row3 { opacity: 0.85; }
+
+.trade-detail-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.td-symbol {
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.td-dir {
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.td-buy  { background: rgba(0, 230, 118, 0.12); color: var(--green); }
+.td-sell { background: rgba(255, 71, 87, 0.12);  color: var(--red); }
+
+.td-vol   { color: var(--text-tertiary); font-size: 10px; }
+.td-sep   { color: var(--border); }
+.td-label { color: var(--text-tertiary); font-size: 10px; letter-spacing: 0.06em; }
+.td-price { color: var(--text-secondary); }
+.td-arrow { color: var(--text-tertiary); }
+.td-pips  { font-weight: 700; font-size: 11px; }
+.td-pos   { color: var(--green); }
+.td-neg   { color: var(--red); }
+.td-ghost { color: var(--text-tertiary); }
+.td-small { font-size: 10px; opacity: 0.8; }
+
+.dir-chip-active {
+  box-shadow: 0 0 0 1px currentColor;
+  cursor: pointer;
+}
+
+.dir-chip {
+  cursor: pointer;
+}
+
+
+.td-test-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+  opacity: 0.5;
+  margin-bottom: 2px;
+}
+
+.mobile-trade-detail {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 /* ─── Expand toggle ─── */
