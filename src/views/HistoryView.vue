@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useChallenges } from '@/composables/useChallenges'
 import { useAuth } from '@/composables/useAuth'
 import { usePageTour } from '@/composables/usePageTour'
+import { usePayouts } from '@/composables/usePayouts'
 
 interface HistoryEntry {
   id: string
@@ -24,6 +25,7 @@ interface HistoryEntry {
 
 const { challengeRows, fetchChallenges } = useChallenges()
 const { user } = useAuth()
+const { totalReceived, fetchPayouts } = usePayouts()
 
 const entries = ref<HistoryEntry[]>([])
 const loading = ref(false)
@@ -279,18 +281,16 @@ const stats = computed(() => {
   const failed    = entries.value.filter(e => e.outcome === 'Failed').length
   const abandoned = entries.value.filter(e => e.outcome === 'Abandoned').length
   const completed = passed + failed + abandoned
-  const payout    = entries.value.reduce((s, e) => s + (e.payout_received ?? 0), 0)
-  const passRate  = completed > 0 ? Math.round(passed / completed * 100) : 0
   const passAvg   = avgDaysByPhase('Passed')
   const failAvg   = avgDaysByPhase('Failed')
-  return { active, passed, failed, abandoned, completed, payout, passRate, passAvg, failAvg }
+  return { active, passed, failed, abandoned, completed, passAvg, failAvg }
 })
 
 const { startPageTour } = usePageTour()
 
 onMounted(async () => {
   await fetchChallenges()
-  await load()
+  await Promise.all([load(), fetchPayouts()])
   await backfillActive()
   buildSuggestions()
   startPageTour('history', [
@@ -345,14 +345,9 @@ onMounted(async () => {
         <div class="sb-val sb-red">{{ stats.failed }}</div>
       </div>
       <div class="sb-sep" />
-      <div class="sb-cell">
-        <div class="sb-label">WIN RATE</div>
-        <div class="sb-val" :class="stats.passRate >= 50 ? 'sb-green' : 'sb-red'">{{ stats.passRate }}<span class="sb-unit">%</span></div>
-      </div>
-      <div class="sb-sep" />
       <div class="sb-cell sb-cell--wide">
         <div class="sb-label">TOTAL EXTRACTED</div>
-        <div class="sb-val sb-accent">{{ fmt(stats.payout) }}</div>
+        <div class="sb-val sb-accent">{{ fmt(totalReceived) }}</div>
       </div>
       <template v-if="stats.passAvg.hasAny">
         <div class="sb-sep" />
@@ -401,13 +396,6 @@ onMounted(async () => {
         </div>
       </template>
 
-      <!-- Win bar -->
-      <div class="sb-win-bar">
-        <div
-          class="sb-win-fill"
-          :style="{ width: stats.passRate + '%' }"
-        />
-      </div>
     </div>
 
     <!-- ── Ledger ── -->
