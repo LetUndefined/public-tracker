@@ -25,7 +25,7 @@ interface HistoryEntry {
 
 const { challengeRows, fetchChallenges } = useChallenges()
 const { user } = useAuth()
-const { totalReceived, fetchPayouts } = usePayouts()
+const { payouts, totalReceived, fetchPayouts } = usePayouts()
 
 const entries = ref<HistoryEntry[]>([])
 const loading = ref(false)
@@ -246,6 +246,20 @@ function pnlClass(entry: HistoryEntry): string {
   return entry.final_balance >= entry.starting_balance ? 'pos' : 'neg'
 }
 
+function isFunded(entry: HistoryEntry): boolean {
+  return entry.phase.toLowerCase().includes('fund')
+}
+
+const payoutsByChallenge = computed(() => {
+  const map: Record<string, number> = {}
+  for (const p of payouts.value) {
+    if (p.status === 'received' && p.challenge_id) {
+      map[p.challenge_id] = (map[p.challenge_id] ?? 0) + p.amount
+    }
+  }
+  return map
+})
+
 function fmt(v: number) {
   return `$${v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
@@ -281,9 +295,7 @@ const stats = computed(() => {
   const failed    = entries.value.filter(e => e.outcome === 'Failed').length
   const abandoned = entries.value.filter(e => e.outcome === 'Abandoned').length
   const completed = passed + failed + abandoned
-  const passAvg   = avgDaysByPhase('Passed')
-  const failAvg   = avgDaysByPhase('Failed')
-  return { active, passed, failed, abandoned, completed, passAvg, failAvg }
+  return { active, passed, failed, abandoned, completed }
 })
 
 const { startPageTour } = usePageTour()
@@ -349,52 +361,6 @@ onMounted(async () => {
         <div class="sb-label">TOTAL EXTRACTED</div>
         <div class="sb-val sb-accent">{{ fmt(totalReceived) }}</div>
       </div>
-      <template v-if="stats.passAvg.hasAny">
-        <div class="sb-sep" />
-        <div class="sb-cell sb-cell--phases">
-          <div class="sb-label sb-label--green">AVG DAYS · PASS</div>
-          <div class="sb-phase-rows">
-            <div class="sb-phase-row" v-if="stats.passAvg.p1 !== null">
-              <span class="sb-phase-tag">PH1</span>
-              <span class="sb-phase-val">{{ stats.passAvg.p1 }}<span class="sb-phase-unit">d</span></span>
-            </div>
-            <div class="sb-phase-row" v-if="stats.passAvg.p2 !== null">
-              <span class="sb-phase-tag">PH2</span>
-              <span class="sb-phase-val">{{ stats.passAvg.p2 }}<span class="sb-phase-unit">d</span></span>
-            </div>
-            <div class="sb-phase-row" v-if="stats.passAvg.funded !== null">
-              <span class="sb-phase-tag">FND</span>
-              <span class="sb-phase-val">{{ stats.passAvg.funded }}<span class="sb-phase-unit">d</span></span>
-            </div>
-            <div class="sb-phase-row sb-phase-empty" v-if="stats.passAvg.p1 === null && stats.passAvg.p2 === null && stats.passAvg.funded === null">
-              <span class="sb-phase-val">—</span>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template v-if="stats.failAvg.hasAny">
-        <div class="sb-sep" />
-        <div class="sb-cell sb-cell--phases">
-          <div class="sb-label sb-label--red">AVG DAYS · FAIL</div>
-          <div class="sb-phase-rows">
-            <div class="sb-phase-row" v-if="stats.failAvg.p1 !== null">
-              <span class="sb-phase-tag">PH1</span>
-              <span class="sb-phase-val">{{ stats.failAvg.p1 }}<span class="sb-phase-unit">d</span></span>
-            </div>
-            <div class="sb-phase-row" v-if="stats.failAvg.p2 !== null">
-              <span class="sb-phase-tag">PH2</span>
-              <span class="sb-phase-val">{{ stats.failAvg.p2 }}<span class="sb-phase-unit">d</span></span>
-            </div>
-            <div class="sb-phase-row" v-if="stats.failAvg.funded !== null">
-              <span class="sb-phase-tag">FND</span>
-              <span class="sb-phase-val">{{ stats.failAvg.funded }}<span class="sb-phase-unit">d</span></span>
-            </div>
-            <div class="sb-phase-row sb-phase-empty" v-if="stats.failAvg.p1 === null && stats.failAvg.p2 === null && stats.failAvg.funded === null">
-              <span class="sb-phase-val">—</span>
-            </div>
-          </div>
-        </div>
-      </template>
 
     </div>
 
@@ -446,10 +412,13 @@ onMounted(async () => {
             <td class="lc-firm">{{ entry.prop_firm }}</td>
             <td class="lc-phase">{{ entry.phase }}</td>
             <td class="lc-r lc-money">{{ entry.starting_balance > 0 ? fmt(entry.starting_balance) : '—' }}</td>
-            <td class="lc-r lc-money">{{ entry.final_balance > 0 ? fmt(entry.final_balance) : '—' }}</td>
-            <td class="lc-r lc-pnl" :class="pnlClass(entry)">{{ pnlPct(entry) || '—' }}</td>
-            <td class="lc-r lc-payout" :class="entry.payout_received > 0 ? 'lc-extracted' : ''">
-              {{ entry.payout_received > 0 ? fmt(entry.payout_received) : '—' }}
+            <td class="lc-r lc-money">{{ isFunded(entry) && entry.final_balance > 0 ? fmt(entry.final_balance) : '—' }}</td>
+            <td class="lc-r lc-pnl" :class="isFunded(entry) ? pnlClass(entry) : ''">{{ isFunded(entry) ? (pnlPct(entry) || '—') : '—' }}</td>
+            <td class="lc-r lc-payout">
+              <template v-if="isFunded(entry) && entry.challenge_id && payoutsByChallenge[entry.challenge_id]">
+                <span class="lc-extracted">{{ fmt(payoutsByChallenge[entry.challenge_id]) }}</span>
+              </template>
+              <template v-else>—</template>
             </td>
             <td class="lc-period">
               <span class="period-start">{{ fmtDate(entry.started_at) }}</span>
