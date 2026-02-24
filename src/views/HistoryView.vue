@@ -61,6 +61,39 @@ async function load() {
   loading.value = false
 }
 
+// Backfill: create Active history entries for any challenge not yet in history
+async function backfillActive() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.user) return
+  const loggedIds = new Set(entries.value.map(e => e.challenge_id).filter(Boolean))
+  const toBackfill = challengeRows.value.filter(
+    r => !r.is_master && !loggedIds.has(r.id)
+  )
+  if (!toBackfill.length) return
+  const inserts = toBackfill.map(r => ({
+    user_id: session.user.id,
+    challenge_id: r.id,
+    alias: r.alias,
+    prop_firm: r.prop_firm,
+    phase: r.phase,
+    outcome: 'Active',
+    starting_balance: r.starting_balance ?? 0,
+    final_balance: 0,
+    payout_received: 0,
+    started_at: r.started_at ?? null,
+    ended_at: null,
+    notes: null,
+  }))
+  const { data } = await supabase.from('challenge_history').insert(inserts).select()
+  if (data) {
+    entries.value = [...data, ...entries.value].sort((a, b) => {
+      if (a.outcome === 'Active' && b.outcome !== 'Active') return -1
+      if (a.outcome !== 'Active' && b.outcome === 'Active') return 1
+      return 0
+    })
+  }
+}
+
 function buildSuggestions() {
   const s: HistoryEntry[] = []
   for (const row of challengeRows.value) {
@@ -258,6 +291,7 @@ const { startPageTour } = usePageTour()
 onMounted(async () => {
   await fetchChallenges()
   await load()
+  await backfillActive()
   buildSuggestions()
   startPageTour('history', [
     {
