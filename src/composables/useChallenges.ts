@@ -161,6 +161,24 @@ export function useChallenges() {
     if (err) throw err
     challenges.value.unshift(data)
 
+    // Auto-create history entry as Active
+    if (challenge.phase !== 'Master') {
+      await supabase.from('challenge_history').insert({
+        user_id: user.id,
+        challenge_id: data.id,
+        alias: challenge.alias || challenge.login_number,
+        prop_firm: challenge.prop_firm,
+        phase: challenge.phase,
+        outcome: 'Active',
+        starting_balance: challenge.starting_balance ?? 0,
+        final_balance: 0,
+        payout_received: 0,
+        started_at: challenge.started_at ?? new Date().toISOString().slice(0, 10),
+        ended_at: null,
+        notes: null,
+      })
+    }
+
     const { push, prefs } = useAppNotifications()
     if (prefs.value.accountEventsEnabled) {
       const name = challenge.alias || challenge.login_number || 'New account'
@@ -185,6 +203,9 @@ export function useChallenges() {
   }
 
   async function deleteChallenge(id: string) {
+    // Preserve history entry by nulling the FK before deletion
+    await supabase.from('challenge_history').update({ challenge_id: null }).eq('challenge_id', id)
+
     const { error: err } = await supabase
       .from('challenges')
       .delete()

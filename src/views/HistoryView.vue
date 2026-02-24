@@ -11,7 +11,7 @@ interface HistoryEntry {
   alias: string
   prop_firm: string
   phase: string
-  outcome: 'Passed' | 'Failed' | 'Abandoned'
+  outcome: 'Passed' | 'Failed' | 'Abandoned' | 'Active'
   starting_balance: number
   final_balance: number
   payout_received: number
@@ -36,7 +36,7 @@ const form = ref({
   alias: '',
   prop_firm: '',
   phase: '',
-  outcome: 'Passed' as 'Passed' | 'Failed' | 'Abandoned',
+  outcome: 'Passed' as 'Passed' | 'Failed' | 'Abandoned' | 'Active',
   starting_balance: '',
   final_balance: '',
   payout_received: '',
@@ -51,7 +51,13 @@ async function load() {
     .from('challenge_history')
     .select('*')
     .order('ended_at', { ascending: false })
-  entries.value = data ?? []
+  // Active entries float to the top
+  const raw = data ?? []
+  entries.value = raw.sort((a, b) => {
+    if (a.outcome === 'Active' && b.outcome !== 'Active') return -1
+    if (a.outcome !== 'Active' && b.outcome === 'Active') return 1
+    return 0
+  })
   loading.value = false
 }
 
@@ -168,6 +174,26 @@ async function save() {
   buildSuggestions()
 }
 
+async function quickSetOutcome(entry: HistoryEntry, outcome: 'Passed' | 'Failed' | 'Abandoned') {
+  const ended_at = new Date().toISOString().slice(0, 10)
+  const { data } = await supabase
+    .from('challenge_history')
+    .update({ outcome, ended_at })
+    .eq('id', entry.id)
+    .select()
+    .single()
+  if (data) {
+    const idx = entries.value.findIndex(e => e.id === entry.id)
+    if (idx !== -1) entries.value[idx] = data
+    // Re-sort so completed entries move below active ones
+    entries.value = [...entries.value].sort((a, b) => {
+      if (a.outcome === 'Active' && b.outcome !== 'Active') return -1
+      if (a.outcome !== 'Active' && b.outcome === 'Active') return 1
+      return 0
+    })
+  }
+}
+
 async function deleteEntry(id: string) {
   if (!confirm('Delete this history entry?')) return
   await supabase.from('challenge_history').delete().eq('id', id)
@@ -215,14 +241,16 @@ function avgDaysByPhase(outcome: 'Passed' | 'Failed') {
 }
 
 const stats = computed(() => {
-  const passed   = entries.value.filter(e => e.outcome === 'Passed').length
-  const failed   = entries.value.filter(e => e.outcome === 'Failed').length
-  const total    = entries.value.length
-  const payout   = entries.value.reduce((s, e) => s + (e.payout_received ?? 0), 0)
-  const passRate = total > 0 ? Math.round(passed / total * 100) : 0
-  const passAvg  = avgDaysByPhase('Passed')
-  const failAvg  = avgDaysByPhase('Failed')
-  return { passed, failed, total, payout, passRate, passAvg, failAvg }
+  const active    = entries.value.filter(e => e.outcome === 'Active').length
+  const passed    = entries.value.filter(e => e.outcome === 'Passed').length
+  const failed    = entries.value.filter(e => e.outcome === 'Failed').length
+  const abandoned = entries.value.filter(e => e.outcome === 'Abandoned').length
+  const completed = passed + failed + abandoned
+  const payout    = entries.value.reduce((s, e) => s + (e.payout_received ?? 0), 0)
+  const passRate  = completed > 0 ? Math.round(passed / completed * 100) : 0
+  const passAvg   = avgDaysByPhase('Passed')
+  const failAvg   = avgDaysByPhase('Failed')
+  return { active, passed, failed, abandoned, completed, payout, passRate, passAvg, failAvg }
 })
 
 const { startPageTour } = usePageTour()
@@ -261,9 +289,16 @@ onMounted(async () => {
 
     <!-- ── Stats scoreboard ── -->
     <div class="scoreboard" v-if="entries.length > 0">
+      <template v-if="stats.active > 0">
+        <div class="sb-cell">
+          <div class="sb-label">ACTIVE</div>
+          <div class="sb-val sb-accent">{{ stats.active }}</div>
+        </div>
+        <div class="sb-sep" />
+      </template>
       <div class="sb-cell">
-        <div class="sb-label">MISSIONS</div>
-        <div class="sb-val">{{ stats.total }}</div>
+        <div class="sb-label">COMPLETED</div>
+        <div class="sb-val">{{ stats.completed }}</div>
       </div>
       <div class="sb-sep" />
       <div class="sb-cell">
@@ -341,36 +376,6 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- ── Suggestions ── -->
-    <div class="alert-banner" v-if="suggestions.length > 0">
-      <div class="alert-head">
-        <span class="alert-pulse" />
-        <span class="alert-title">DETECTED OUTCOMES</span>
-        <span class="alert-count">{{ suggestions.length }}</span>
-      </div>
-      <div
-        v-for="s in suggestions"
-        :key="s.challenge_id!"
-        class="alert-row"
-      >
-        <span class="alert-outcome">{{ s.outcome.toUpperCase() }}</span>
-        <span class="alert-alias">{{ s.alias }}</span>
-        <span class="alert-meta">{{ s.prop_firm }} · {{ s.phase }}</span>
-        <button class="alert-confirm-btn" @click="openAdd({
-          challenge_id: s.challenge_id!,
-          alias: s.alias,
-          prop_firm: s.prop_firm,
-          phase: s.phase,
-          outcome: s.outcome,
-          starting_balance: String(s.starting_balance),
-          final_balance: String(s.final_balance),
-          started_at: s.started_at ?? '',
-          ended_at: s.ended_at ?? '',
-          notes: s.notes ?? '',
-        })">LOG →</button>
-      </div>
-    </div>
-
     <!-- ── Ledger ── -->
     <div class="ledger-wrap">
       <div v-if="loading" class="ledger-empty">
@@ -411,7 +416,8 @@ onMounted(async () => {
             <!-- Left status bar -->
             <td class="lc-status">
               <span class="status-pill" :class="'pill-' + entry.outcome.toLowerCase()">
-                {{ entry.outcome === 'Passed' ? 'PASS' : entry.outcome === 'Failed' ? 'FAIL' : 'ABND' }}
+                <span v-if="entry.outcome === 'Active'" class="pill-active-dot" />
+                {{ entry.outcome === 'Passed' ? 'PASS' : entry.outcome === 'Failed' ? 'FAIL' : entry.outcome === 'Active' ? 'ACTIVE' : 'ABND' }}
               </span>
             </td>
             <td class="lc-alias">{{ entry.alias }}</td>
@@ -426,22 +432,30 @@ onMounted(async () => {
             <td class="lc-period">
               <span class="period-start">{{ fmtDate(entry.started_at) }}</span>
               <span class="period-arrow">→</span>
-              <span class="period-end">{{ fmtDate(entry.ended_at) }}</span>
+              <span v-if="entry.outcome === 'Active'" class="period-end period-ongoing">ongoing</span>
+              <span v-else class="period-end">{{ fmtDate(entry.ended_at) }}</span>
             </td>
             <td class="lc-r lc-days">{{ entry.duration_days ?? '—' }}</td>
             <td class="lc-notes">{{ entry.notes ?? '' }}</td>
-            <td class="lc-act">
-              <button class="act-edit" @click="openEdit(entry)" title="Edit">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                </svg>
-              </button>
-              <button class="act-del" @click="deleteEntry(entry.id)" title="Delete">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                  <path d="M18 6 6 18M6 6l12 12"/>
-                </svg>
-              </button>
+            <td class="lc-act" :class="entry.outcome === 'Active' ? 'lc-act--active' : ''">
+              <template v-if="entry.outcome === 'Active'">
+                <button class="qsa-btn qsa-pass" @click="quickSetOutcome(entry, 'Passed')" title="Mark Passed">PASS</button>
+                <button class="qsa-btn qsa-fail" @click="quickSetOutcome(entry, 'Failed')" title="Mark Failed">FAIL</button>
+                <button class="qsa-btn qsa-abnd" @click="quickSetOutcome(entry, 'Abandoned')" title="Mark Abandoned">ABND</button>
+              </template>
+              <template v-else>
+                <button class="act-edit" @click="openEdit(entry)" title="Edit">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                  </svg>
+                </button>
+                <button class="act-del" @click="deleteEntry(entry.id)" title="Delete">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M18 6 6 18M6 6l12 12"/>
+                  </svg>
+                </button>
+              </template>
             </td>
           </tr>
         </tbody>
@@ -497,7 +511,7 @@ onMounted(async () => {
                 <label class="field-lbl">Outcome *</label>
                 <div class="outcome-toggle">
                   <button
-                    v-for="o in ['Passed', 'Failed', 'Abandoned']"
+                    v-for="o in ['Active', 'Passed', 'Failed', 'Abandoned']"
                     :key="o"
                     type="button"
                     class="ot-btn"
@@ -929,10 +943,10 @@ onMounted(async () => {
 }
 
 .lh-r { text-align: right; }
-.lh-status { width: 72px; }
+.lh-status { width: 80px; }
 .lh-days { width: 52px; }
 .lh-notes { max-width: 160px; }
-.lh-act { width: 64px; }
+.lh-act { width: auto; min-width: 64px; }
 
 /* Rows */
 .ledger-row {
@@ -952,10 +966,12 @@ onMounted(async () => {
 .row-passed  { border-left-color: rgba(0, 230, 118, 0.5); }
 .row-failed  { border-left-color: rgba(255, 71, 87, 0.5); }
 .row-abandoned { border-left-color: rgba(255, 159, 67, 0.5); }
+.row-active  { border-left-color: rgba(240, 180, 41, 0.6); background: rgba(240, 180, 41, 0.025); }
 
 .row-passed:hover  { background: rgba(0, 230, 118, 0.04); border-left-color: var(--green); }
 .row-failed:hover  { background: rgba(255, 71, 87, 0.04); border-left-color: var(--red); }
 .row-abandoned:hover { background: rgba(255, 159, 67, 0.04); border-left-color: rgba(255,159,67,0.9); }
+.row-active:hover  { background: rgba(240, 180, 41, 0.05); border-left-color: var(--accent); }
 
 /* Cells */
 .ledger-row td {
@@ -997,6 +1013,27 @@ onMounted(async () => {
   background: rgba(255, 159, 67, 0.08);
   border: 1px solid rgba(255, 159, 67, 0.2);
   color: #ff9f43;
+}
+
+.pill-active {
+  background: rgba(240, 180, 41, 0.12);
+  border: 1px solid rgba(240, 180, 41, 0.3);
+  color: var(--accent);
+  gap: 5px;
+}
+
+.pill-active-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse-active 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse-active {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
 }
 
 .lc-alias {
@@ -1049,6 +1086,7 @@ onMounted(async () => {
 
 .period-start, .period-end { color: var(--text-muted); }
 .period-arrow { color: var(--border); font-size: 9px; }
+.period-ongoing { color: var(--accent); opacity: 0.7; font-style: italic; }
 
 .lc-days {
   font-family: 'JetBrains Mono', monospace;
@@ -1072,6 +1110,45 @@ onMounted(async () => {
   gap: 4px;
   padding: 8px 10px;
 }
+
+.lc-act--active {
+  gap: 3px;
+}
+
+/* Quick status action buttons for Active rows */
+.qsa-btn {
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.qsa-pass {
+  background: rgba(0, 230, 118, 0.08);
+  border: 1px solid rgba(0, 230, 118, 0.2);
+  color: var(--green);
+}
+
+.qsa-fail {
+  background: rgba(255, 71, 87, 0.08);
+  border: 1px solid rgba(255, 71, 87, 0.2);
+  color: var(--red);
+}
+
+.qsa-abnd {
+  background: rgba(255, 159, 67, 0.06);
+  border: 1px solid rgba(255, 159, 67, 0.18);
+  color: #ff9f43;
+}
+
+.qsa-pass:hover { background: rgba(0, 230, 118, 0.18); border-color: rgba(0, 230, 118, 0.4); }
+.qsa-fail:hover { background: rgba(255, 71, 87, 0.18); border-color: rgba(255, 71, 87, 0.38); }
+.qsa-abnd:hover { background: rgba(255, 159, 67, 0.16); border-color: rgba(255, 159, 67, 0.38); }
 
 .act-edit, .act-del {
   width: 26px;
@@ -1231,6 +1308,7 @@ onMounted(async () => {
   transition: all 0.15s;
 }
 
+.ot-btn.ot-active.ot-active   { background: rgba(240,180,41,0.12); border-color: rgba(240,180,41,0.35); color: var(--accent); }
 .ot-btn.ot-active.ot-passed  { background: rgba(0,230,118,0.1); border-color: rgba(0,230,118,0.35); color: var(--green); }
 .ot-btn.ot-active.ot-failed  { background: rgba(255,71,87,0.1); border-color: rgba(255,71,87,0.3); color: var(--red); }
 .ot-btn.ot-active.ot-abandoned { background: rgba(255,159,67,0.1); border-color: rgba(255,159,67,0.3); color: #ff9f43; }
