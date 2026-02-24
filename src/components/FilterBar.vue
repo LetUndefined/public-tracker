@@ -4,6 +4,7 @@ import type { ChallengeRow } from '@/types'
 
 const props = defineProps<{
   rows: ChallengeRow[]
+  unlinkedCount?: number
 }>()
 
 const search = defineModel<string>('search', { default: '' })
@@ -129,6 +130,7 @@ const activeFilterCount = computed(() => {
         <path d="M12 5v14M5 12h14"/>
       </svg>
       Add Challenge
+      <span v-if="unlinkedCount && unlinkedCount > 0" class="btn-add-badge">{{ unlinkedCount }}</span>
     </button>
 
   </div>
@@ -352,6 +354,22 @@ const activeFilterCount = computed(() => {
 
 .btn-add:hover {
   background: var(--accent-bright);
+}
+
+.btn-add-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  background: var(--bg);
+  color: var(--accent);
+  border-radius: 9px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 /* ── Responsive ──────────────────────────────────────── */

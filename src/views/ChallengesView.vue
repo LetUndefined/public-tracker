@@ -140,6 +140,7 @@ onUnmounted(() => {
         v-model:status="statusFilter"
         v-model:showMaster="showMaster"
         :rows="challengeRows"
+        :unlinked-count="unlinkedAccounts.length"
         @add-challenge="showModal = true"
       />
 
