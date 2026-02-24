@@ -426,9 +426,14 @@ onMounted(async () => {
             <td class="lc-notes">{{ entry.notes ?? '' }}</td>
             <td class="lc-act" :class="entry.outcome === 'Active' ? 'lc-act--active' : ''">
               <template v-if="entry.outcome === 'Active'">
-                <button class="qsa-btn qsa-pass" @click="quickSetOutcome(entry, 'Passed')" title="Mark Passed">PASS</button>
-                <button class="qsa-btn qsa-fail" @click="quickSetOutcome(entry, 'Failed')" title="Mark Failed">FAIL</button>
-                <button class="qsa-btn qsa-abnd" @click="quickSetOutcome(entry, 'Abandoned')" title="Mark Abandoned">ABND</button>
+                <template v-if="isFunded(entry)">
+                  <button class="qsa-btn qsa-fail" @click="quickSetOutcome(entry, 'Failed')" title="Mark Failed">FAIL</button>
+                </template>
+                <template v-else>
+                  <button class="qsa-btn qsa-pass" @click="quickSetOutcome(entry, 'Passed')" title="Mark Passed">PASS</button>
+                  <button class="qsa-btn qsa-fail" @click="quickSetOutcome(entry, 'Failed')" title="Mark Failed">FAIL</button>
+                  <button class="qsa-btn qsa-abnd" @click="quickSetOutcome(entry, 'Abandoned')" title="Mark Abandoned">ABND</button>
+                </template>
               </template>
               <button class="act-edit" @click="openEdit(entry)" title="Edit">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
