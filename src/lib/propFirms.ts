@@ -142,6 +142,11 @@ export const propFirms: PropFirmConfig[] = [
     { name: 'Phase 2', target_pct: 5,  daily_dd_pct: 5, max_dd_pct: 10 },
     { name: 'Funded',  target_pct: 0,  daily_dd_pct: 5, max_dd_pct: 10 },
   ]},
+  { id: '30', name: 'BrightFunded', phases: [
+    { name: 'Phase 1', target_pct: 8, daily_dd_pct: 5, max_dd_pct: 10 },
+    { name: 'Phase 2', target_pct: 5, daily_dd_pct: 5, max_dd_pct: 10 },
+    { name: 'Funded',  target_pct: 0, daily_dd_pct: 5, max_dd_pct: 10 },
+  ]},
 
   // ── Custom / Other ───────────────────────────────────────────────────────
   { id: '99', name: 'Other / Custom', phases: [
